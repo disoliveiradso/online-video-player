@@ -21,7 +21,7 @@ import {
   ArrowLeft, 
   MonitorPlay, 
   ExternalLink,
-  HelpCircle
+  CircleHelp
 } from 'lucide-react';
 
 // Declarar tipo para a API do YouTube
@@ -67,7 +67,7 @@ export default function App() {
 
   // Helper: Detecta se o link é do YouTube e retorna o ID do vídeo
   const getYouTubeId = (url: string): string | null => {
-    const regExp = /^^(?:https?:\/\/)?(?:www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
+    const regExp = /^(?:https?:\/\/)?(?:www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
     const match = url.match(regExp);
     return (match && match[1]) ? match[1] : null;
   };
@@ -565,7 +565,7 @@ export default function App() {
             onClick={() => setShowMeetHelp(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold glass-input text-zinc-300 hover:text-white hover:border-orange-500/50 cursor-pointer"
           >
-            <HelpCircle className="w-4 h-4 text-orange-400" />
+            <CircleHelp className="w-4 h-4 text-orange-400" />
             <span>Guia Google Meet</span>
           </button>
           
@@ -771,7 +771,7 @@ export default function App() {
                   }}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-950/80 text-orange-400 border border-orange-500/30 hover:bg-zinc-900 cursor-pointer"
                 >
-                  <HelpCircle className="w-3.5 h-3.5" />
+                  <CircleHelp className="w-3.5 h-3.5" />
                   <span>Transmitindo no Meet?</span>
                 </button>
               </div>
