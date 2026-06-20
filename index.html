@@ -1,18 +1,1345 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%23f97316'><path d='M0 224c0 17.7 14.3 32 32 32s32-14.3 32-32c0-53 43-96 96-96H320v32c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l64-64c12.5-12.5 12.5-32.8 0-45.3l-64-64c-9.2-9.2-22.9-11.9-34.9-6.9S320 19.1 320 32V64H160C71.6 64 0 135.6 0 224zm512 64c-17.7 0-32 14.3-32 32c0 53-43 96-96 96H192v-32c0-12.9-7.8-24.6-19.8-29.6s-25.7-2.2-34.9 6.9l-64 64c-12.5 12.5-12.5 32.8 0 45.3l64 64c9.2 9.2 22.9 11.9 34.9 6.9s19.8-16.6 19.8-29.6V448H384c88.4 0 160-71.6 160-160c0-17.7-14.3-32-32-32z'/></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MeetPlayer - Premium Online Video Player</title>
-    <meta name="description" content="Reproduza qualquer vídeo online direto no seu navegador com controles personalizados e qualidade máxima para transmissões no Google Meet." />
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  </head>
-  <body class="bg-zinc-950 text-zinc-100">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%23f97316'><path d='M0 224c0 17.7 14.3 32 32 32s32-14.3 32-32c0-53 43-96 96-96H320v32c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l64-64c12.5-12.5 12.5-32.8 0-45.3l-64-64c-9.2-9.2-22.9-11.9-34.9-6.9S320 19.1 320 32V64H160C71.6 64 0 135.6 0 224zm512 64c-17.7 0-32 14.3-32 32c0 53-43 96-96 96H192v-32c0-12.9-7.8-24.6-19.8-29.6s-25.7-2.2-34.9 6.9l-64 64c-12.5 12.5-12.5 32.8 0 45.3l64 64c9.2 9.2 22.9 11.9 34.9 6.9s19.8-16.6 19.8-29.6V448H384c88.4 0 160-71.6 160-160c0-17.7-14.3-32-32-32z'/></svg>" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeetPlayer - Premium Online Video Player</title>
+  <meta name="description" content="Reproduza qualquer vídeo online direto no seu navegador com controles personalizados e qualidade máxima para transmissões no Google Meet." />
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- HLS.js CDN para suporte a transmissões .m3u8 -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style type="text/css">
+    body {
+      background-color: #09090b;
+      color: #f4f4f5;
+    }
+    
+    /* Glassmorphism Panel */
+    .glass-panel {
+      background: rgba(15, 15, 20, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-input {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .glass-input:focus {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: #f97316;
+      box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+      outline: none;
+    }
+
+    /* Custom Play Button Gradient */
+    .play-btn-gradient-border {
+      background: linear-gradient(#18181b, #18181b) padding-box,
+                  linear-gradient(135deg, #f97316, #d946ef) border-box;
+      border: 3px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    .play-btn-gradient-border:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 15px rgba(249, 115, 22, 0.4);
+    }
+
+    /* Video Player Timeline styling */
+    .timeline-range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+      transition: height 0.1s ease;
+    }
+
+    .timeline-container:hover .timeline-range {
+      height: 6px;
+    }
+
+    .timeline-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #f97316;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    .timeline-container:hover .timeline-range::-webkit-slider-thumb {
+      transform: scale(1.3);
+    }
+
+    .timeline-range::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      border: none;
+      border-radius: 50%;
+      background: #f97316;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    .timeline-container:hover .timeline-range::-moz-range-thumb {
+      transform: scale(1.3);
+    }
+
+    /* Volume range styling */
+    .volume-range {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .volume-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+    }
+
+    .volume-range::-moz-range-thumb {
+      width: 10px;
+      height: 10px;
+      border: none;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+    }
+
+    /* Custom Tooltip styling */
+    .tooltip {
+      position: relative;
+    }
+
+    .tooltip::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: #18181b;
+      color: #f4f4f5;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s ease;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+
+    .tooltip:hover::after {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body class="min-h-screen w-full flex flex-col justify-between relative overflow-x-hidden">
+
+  <!-- Fundo com gradientes decorativos -->
+  <div class="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-orange-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+  <div class="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-fuchsia-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+  <!-- HEADER -->
+  <header class="w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-between z-10">
+    <div class="flex items-center gap-3 cursor-pointer" onclick="backToHome()">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+        <i data-lucide="monitor-play" class="w-6 h-6 text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-zinc-200 to-zinc-400">
+          MeetPlayer
+        </h1>
+        <p class="text-[10px] text-zinc-500 font-semibold tracking-wider uppercase">Premium Video</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-4">
+      <button 
+        onclick="openMeetHelp()"
+        class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold glass-input text-zinc-300 hover:text-white hover:border-orange-500/50 cursor-pointer"
+      >
+        <i data-lucide="circle-help" class="w-4 h-4 text-orange-400"></i>
+        <span>Guia Google Meet</span>
+      </button>
+      
+      <a 
+        href="https://github.com/disoliveiradso/online-video-player"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors"
+      >
+        <span>GitHub</span>
+        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+      </a>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-center z-10">
+    
+    <!-- TELA INICIAL (SELEÇÃO) -->
+    <div id="selection-screen" class="w-full max-w-2xl glass-panel rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-orange-500/10 to-transparent rounded-bl-3xl pointer-events-none"></div>
+      
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-extrabold text-white tracking-tight">
+          Reproduza qualquer vídeo online
+        </h2>
+        <p class="text-sm text-zinc-400 mt-2 max-w-md mx-auto">
+          Arraste um vídeo local (sem limite de tamanho) ou insira links direto no navegador. Funciona por clique duplo direto no arquivo index.html!
+        </p>
+      </div>
+
+      <form onsubmit="startPlayback(event)" class="space-y-6">
+        
+        <!-- SEÇÃO DE ARQUIVO LOCAL -->
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Arquivo de Vídeo Local</label>
+          <div 
+            id="dropzone"
+            class="border-2 border-dashed border-zinc-800 hover:border-zinc-600 bg-zinc-950/20 rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 relative"
+            onclick="document.getElementById('local-video-file').click()"
+          >
+            <input 
+              type="file" 
+              id="local-video-file" 
+              accept="video/*" 
+              class="hidden" 
+              onchange="handleLocalFileChange(event)"
+            />
+            <i data-lucide="upload" id="upload-icon" class="w-8 h-8 mx-auto mb-3 text-zinc-500"></i>
+            <div id="upload-text">
+              <p class="text-sm font-medium text-zinc-300">Escolha ou solte um arquivo de vídeo</p>
+              <p class="text-xs text-zinc-500 mt-1">MP4, WebM, MKV, AVI, etc. (Sem limite de tamanho)</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- DIVISOR -->
+        <div class="flex items-center justify-between text-zinc-600 text-xs font-bold uppercase py-2">
+          <div class="h-[1px] bg-zinc-800 flex-1"></div>
+          <span class="px-4">ou</span>
+          <div class="h-[1px] bg-zinc-800 flex-1"></div>
+        </div>
+
+        <!-- SEÇÃO DE LINK ONLINE -->
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Link do Vídeo na Web</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <i data-lucide="link" class="h-5 w-5 text-zinc-500"></i>
+            </div>
+            <input
+              type="url"
+              id="url-input"
+              placeholder="https://exemplo.com/filme.mp4 ou link do YouTube"
+              oninput="handleUrlInput()"
+              class="w-full pl-11 pr-4 py-3.5 text-sm rounded-2xl glass-input text-white font-medium"
+            />
+          </div>
+          <p class="text-[11px] text-zinc-500">
+            Suporta arquivos diretos de nuvem (Google Drive, Dropbox) e streams de vídeo.
+          </p>
+        </div>
+
+        <!-- SEÇÃO DE LEGENDAS (OPCIONAL) -->
+        <div class="bg-zinc-950/30 border border-zinc-900 rounded-2xl p-4 space-y-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="subtitles" class="w-4.5 h-4.5 text-zinc-400"></i>
+            <h3 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Legendas / CC (Opcional)</h3>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Arquivo Local (.srt ou .vtt)</label>
+              <input 
+                type="file" 
+                id="subtitle-file"
+                accept=".srt,.vtt" 
+                onchange="handleSubtitleFileChange(event)"
+                class="w-full text-xs text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 cursor-pointer"
+              />
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Link da Legenda (.vtt)</label>
+              <input 
+                type="url" 
+                id="subtitle-url-input"
+                placeholder="https://exemplo.com/legenda.vtt"
+                oninput="handleSubtitleUrlInput()"
+                class="w-full px-3 py-2 text-xs rounded-xl glass-input text-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTÃO SUBMIT -->
+        <button
+          type="submit"
+          id="btn-play"
+          disabled
+          class="w-full py-4 bg-gradient-to-r from-orange-500 to-fuchsia-600 hover:from-orange-600 hover:to-fuchsia-700 disabled:opacity-40 disabled:pointer-events-none text-white font-bold rounded-2xl shadow-xl shadow-orange-500/10 cursor-pointer hover:shadow-orange-500/20 hover:scale-[1.01] transition-all duration-200"
+        >
+          Abrir Reprodutor
+        </button>
+      </form>
+    </div>
+
+    <!-- TELA DO VIDEO PLAYER -->
+    <div 
+      id="player-screen"
+      class="hidden w-full max-w-5xl rounded-3xl overflow-hidden glass-panel relative shadow-2xl flex flex-col group/container aspect-video"
+    >
+      <div 
+        id="player-container"
+        class="flex-1 w-full h-full relative bg-black flex items-center justify-center overflow-hidden"
+      >
+        
+        <!-- Elemento de Vídeo HTML5 -->
+        <video
+          id="main-video"
+          class="w-full h-full object-contain"
+          playsinline
+          onclick="togglePlay()"
+        >
+          <!-- Legendas serão injetadas aqui -->
+        </video>
+
+        <!-- Elemento de Vídeo YouTube (Iframe API) -->
+        <div id="yt-player-wrapper" class="hidden w-full h-full pointer-events-none select-none">
+          <div id="yt-player-container" class="w-full h-full"></div>
+        </div>
+
+        <!-- Overlay transparente para clicks no vídeo e exibição de controles -->
+        <div 
+          class="absolute inset-0 cursor-pointer"
+          onclick="togglePlay()"
+          id="click-overlay"
+        ></div>
+
+        <!-- BOTÃO DE DICA DO GOOGLE MEET INTEGRADO -->
+        <div id="meet-tip-btn" class="absolute top-6 left-6 transition-all duration-300 z-20">
+          <button
+            onclick="event.stopPropagation(); openMeetHelp()"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-950/80 text-orange-400 border border-orange-500/30 hover:bg-zinc-900 cursor-pointer"
+          >
+            <i data-lucide="circle-help" class="w-3.5 h-3.5"></i>
+            <span>Transmitindo no Meet?</span>
+          </button>
+        </div>
+
+        <!-- BOTÃO VOLTAR SUPERIOR -->
+        <div id="back-btn" class="absolute top-6 right-6 transition-all duration-300 z-20">
+          <button
+            onclick="event.stopPropagation(); backToHome()"
+            class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-zinc-950/80 hover:bg-zinc-900 text-white border border-zinc-800 cursor-pointer"
+          >
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            <span>Sair</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- PAINEL DE CONTROLES CUSTOMIZADOS (Estilo Imagem) -->
+      <div 
+        id="player-controls"
+        class="w-full bg-gradient-to-t from-zinc-950/95 via-zinc-950/90 to-zinc-950/0 px-6 pb-6 pt-10 absolute bottom-0 left-0 right-0 z-30 transition-all duration-300 flex flex-col gap-4 select-none"
+      >
+        <!-- TIMELINE (Timeline com thumb laranja) -->
+        <div class="w-full flex items-center gap-3 timeline-container">
+          <span id="current-time-text" class="text-[11px] font-medium text-zinc-400 font-mono min-w-[50px] text-left">
+            00:00
+          </span>
+          
+          <input
+            type="range"
+            id="timeline-slider"
+            min="0"
+            max="100"
+            value="0"
+            oninput="seekVideo(event)"
+            class="timeline-range flex-1"
+          />
+          
+          <span id="duration-time-text" class="text-[11px] font-medium text-zinc-400 font-mono min-w-[50px] text-right">
+            00:00
+          </span>
+        </div>
+
+        <!-- BARRA DE BOTÕES E TÍTULO -->
+        <div class="w-full flex items-center justify-between">
+          
+          <!-- LADO ESQUERDO: Título -->
+          <div class="max-w-[30%] truncate">
+            <h3 id="video-title" class="text-sm font-bold text-white tracking-wide truncate">
+              Título do Vídeo
+            </h3>
+            <p class="text-[10px] text-zinc-500 font-medium">MeetPlayer Premium</p>
+          </div>
+
+          <!-- CENTRO: Controles Mapeados da Imagem -->
+          <div class="flex items-center gap-4">
+            
+            <!-- Botão 1: Alternar Ordem / Shuffle (com barra de desativado) -->
+            <button 
+              id="btn-shuffle"
+              onclick="toggleShuffle()"
+              class="tooltip p-2 rounded-lg transition-colors cursor-pointer text-zinc-500 hover:text-zinc-300"
+              data-tooltip="Modo Aleatório Desligado"
+            >
+              <div class="relative">
+                <i data-lucide="shuffle" class="w-4 h-4"></i>
+                <div id="shuffle-slash" class="absolute inset-0 flex items-center justify-center">
+                  <div class="w-[18px] h-[1.5px] bg-zinc-500 rotate-45"></div>
+                </div>
+              </div>
+            </button>
+
+            <!-- Botão 2: Voltar ao Início (|<) -->
+            <button 
+              onclick="skipToStart()"
+              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              title="Voltar ao Início"
+            >
+              <i data-lucide="skip-back" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Botão 3: Voltar 10s -->
+            <button 
+              onclick="skipBackward()"
+              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer flex flex-col items-center justify-center relative"
+              title="Voltar 10s"
+            >
+              <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+              <span class="text-[7px] font-bold absolute top-[11px] text-zinc-300">10</span>
+            </button>
+
+            <!-- Botão 4: Play/Pause Centralizado (Borda com Gradiente Colorido) -->
+            <button 
+              onclick="togglePlay()"
+              id="btn-play-pause"
+              class="w-12 h-12 rounded-full flex items-center justify-center play-btn-gradient-border text-white shadow-xl cursor-pointer"
+              title="Reproduzir"
+            >
+              <i data-lucide="play" id="play-icon" class="w-5 h-5 translate-x-[1.5px] fill-white"></i>
+            </button>
+
+            <!-- Botão 5: Avançar 30s -->
+            <button 
+              onclick="skipForward()"
+              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer flex flex-col items-center justify-center relative"
+              title="Avançar 30s"
+            >
+              <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+              <span class="text-[7px] font-bold absolute top-[11px] text-zinc-300">30</span>
+            </button>
+
+            <!-- Botão 6: Avançar ao Fim (>|) -->
+            <button 
+              onclick="skipToEnd()"
+              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              title="Avançar ao Fim"
+            >
+              <i data-lucide="skip-forward" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Botão 7: Repetir / Loop (com barra de desativado) -->
+            <button 
+              id="btn-loop"
+              onclick="toggleLoop()"
+              class="tooltip p-2 rounded-lg transition-colors cursor-pointer text-zinc-500 hover:text-zinc-300"
+              data-tooltip="Repetir Vídeo Desligado"
+            >
+              <div class="relative">
+                <i data-lucide="repeat" class="w-4 h-4"></i>
+                <div id="loop-slash" class="absolute inset-0 flex items-center justify-center">
+                  <div class="w-[18px] h-[1.5px] bg-zinc-500 rotate-45"></div>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <!-- LADO DIREITO: CC, Volume, Fullscreen, PiP (Sem os 3 pontinhos) -->
+          <div class="flex items-center gap-3">
+            
+            <!-- Botão 8: Legendas / CC -->
+            <button 
+              id="btn-cc"
+              onclick="toggleSubtitles()"
+              class="p-2 rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              title="Status das Legendas"
+            >
+              <i data-lucide="subtitles" class="w-4.5 h-4.5"></i>
+            </button>
+
+            <!-- Botão 9: Volume com Slider -->
+            <div class="flex items-center gap-2 group/volume">
+              <button 
+                onclick="toggleMute()"
+                class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                title="Mudo (M)"
+              >
+                <i data-lucide="volume-2" id="volume-icon" class="w-4.5 h-4.5"></i>
+              </button>
+              <input
+                type="range"
+                id="volume-slider"
+                min="0"
+                max="1"
+                step="0.05"
+                value="0.8"
+                oninput="changeVolume(event)"
+                class="volume-range w-0 group-hover/volume:w-16 focus:w-16 transition-all duration-300 origin-left"
+              />
+            </div>
+
+            <!-- Botão 10: Picture-in-Picture -->
+            <button 
+              onclick="togglePictureInPicture()"
+              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              title="Picture-in-Picture (P)"
+            >
+              <i data-lucide="picture-in-picture-2" class="w-4.5 h-4.5"></i>
+            </button>
+
+            <!-- Botão 11: Tela Cheia -->
+            <button 
+              onclick="toggleFullscreen()"
+              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              title="Tela Cheia (F)"
+            >
+              <i data-lucide="maximize" id="fullscreen-icon" class="w-4.5 h-4.5"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL DO GUIA DO GOOGLE MEET -->
+  <div 
+    id="meet-help-modal" 
+    class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 z-50"
+    onclick="closeMeetHelp()"
+  >
+    <div 
+      class="w-full max-w-lg glass-panel rounded-3xl p-8 shadow-2xl relative"
+      onclick="event.stopPropagation()"
+    >
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 rounded-xl bg-green-600/20 border border-green-500/30 flex items-center justify-center">
+          <i data-lucide="monitor-play" class="w-6 h-6 text-green-400"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-white">Transmissão Perfeita no Google Meet</h3>
+          <p class="text-xs text-zinc-400">Como compartilhar som e vídeo com alta fluidez</p>
+        </div>
+      </div>
+
+      <div class="space-y-4 text-sm text-zinc-300">
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-orange-400 shrink-0">1</div>
+          <p>No Google Meet, clique no botão de <strong>Apresentar agora</strong> (ícone de tela com seta).</p>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-orange-400 shrink-0">2</div>
+          <p>Escolha a opção de <strong>Uma guia do Chrome</strong> (esta é a única opção que otimiza áudio e vídeo nativamente).</p>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-orange-400 shrink-0">3</div>
+          <p>Selecione a guia correspondente ao <strong>MeetPlayer</strong> na lista.</p>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-orange-400 shrink-0">4</div>
+          <p><strong>IMPORTANTE:</strong> Certifique-se de que a caixinha <strong>"Compartilhar áudio da guia"</strong> na parte inferior esquerda esteja marcada.</p>
+        </div>
+      </div>
+
+      <div class="mt-8 flex justify-end">
+        <button
+          onclick="closeMeetHelp()"
+          class="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-fuchsia-600 hover:from-orange-600 hover:to-fuchsia-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-orange-500/10 cursor-pointer"
+        >
+          Entendido
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="w-full max-w-7xl mx-auto px-6 py-6 text-center text-xs text-zinc-600 border-t border-zinc-900/50 z-10">
+    <p>&copy; <span id="year"></span> MeetPlayer. Desenvolvido com amor pelo Google.</p>
+    <p class="mt-1">Pressione <kbd class="bg-zinc-900 px-1 py-0.5 rounded text-[10px]">Espaço</kbd> para Play/Pause e as setas para ajustar tempo e volume.</p>
+  </footer>
+
+  <!-- SCRIPT DE LÓGICA DO PLAYER (Vanilla JS) -->
+  <script>
+    // Configura o ano dinamicamente no footer
+    document.getElementById('year').innerText = new Date().getFullYear();
+
+    // VARIÁVEIS DE ESTADO GLOBAL
+    let isPlayingMode = false;
+    let videoSource = '';
+    let videoTitle = 'Reprodutor de Vídeo';
+    let videoType = null; // 'local' | 'url' | 'youtube'
+
+    let isPlaying = false;
+    let volume = 0.8;
+    let isMuted = false;
+    let isLooping = false;
+    let isShuffle = false;
+    let isFullscreen = false;
+    let currentTime = 0;
+    let duration = 0;
+
+    let selectedLocalFile = null;
+    let selectedSubtitleFile = null;
+    let subtitleUrl = '';
+    let resolvedSubtitleBlobUrl = '';
+
+    // Elementos da DOM
+    const selectionScreen = document.getElementById('selection-screen');
+    const playerScreen = document.getElementById('player-screen');
+    const dropzone = document.getElementById('dropzone');
+    const urlInput = document.getElementById('url-input');
+    const localVideoFileInput = document.getElementById('local-video-file');
+    const subtitleFileInput = document.getElementById('subtitle-file');
+    const subtitleUrlInput = document.getElementById('subtitle-url-input');
+    const btnPlay = document.getElementById('btn-play');
+    
+    const mainVideo = document.getElementById('main-video');
+    const ytPlayerWrapper = document.getElementById('yt-player-wrapper');
+    const domVideoTitle = document.getElementById('video-title');
+    const btnPlayPause = document.getElementById('btn-play-pause');
+    const timelineSlider = document.getElementById('timeline-slider');
+    const currentTimeText = document.getElementById('current-time-text');
+    const durationTimeText = document.getElementById('duration-time-text');
+    const volumeSlider = document.getElementById('volume-slider');
+    
+    // Controles do Google Meet
+    const meetHelpModal = document.getElementById('meet-help-modal');
+    
+    // Referências a timeouts/intervals
+    let syncInterval = null;
+    let controlsTimeout = null;
+    let ytPlayer = null;
+
+    // Inicialização do Lucide
+    lucide.createIcons();
+
+    // DRAG AND DROP
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('border-orange-500', 'bg-orange-950/15');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('border-orange-500', 'bg-orange-950/15');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('border-orange-500', 'bg-orange-950/15');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        setLocalFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    function handleLocalFileChange(e) {
+      if (e.target.files && e.target.files[0]) {
+        setLocalFile(e.target.files[0]);
+      }
+    }
+
+    function setLocalFile(file) {
+      selectedLocalFile = file;
+      urlInput.value = ''; // limpa link externo
+      
+      const uploadIcon = document.getElementById('upload-icon');
+      const uploadText = document.getElementById('upload-text');
+      
+      uploadIcon.classList.add('text-orange-500');
+      dropzone.classList.add('border-orange-500', 'bg-orange-950/10');
+      
+      uploadText.innerHTML = `
+        <p class="text-sm font-semibold text-white truncate px-4">${file.name}</p>
+        <p class="text-xs text-zinc-500 mt-1">${(file.size / (1024 * 1024)).toFixed(1)} MB (Sem limite de tamanho)</p>
+      `;
+      validateInputs();
+    }
+
+    function handleUrlInput() {
+      if (urlInput.value.trim()) {
+        selectedLocalFile = null;
+        // Reseta dropzone
+        document.getElementById('upload-icon').classList.remove('text-orange-500');
+        dropzone.classList.remove('border-orange-500', 'bg-orange-950/10');
+        document.getElementById('upload-text').innerHTML = `
+          <p class="text-sm font-medium text-zinc-300">Escolha ou solte um arquivo de vídeo</p>
+          <p class="text-xs text-zinc-500 mt-1">MP4, WebM, MKV, AVI, etc. (Sem limite de tamanho)</p>
+        `;
+      }
+      validateInputs();
+    }
+
+    function handleSubtitleFileChange(e) {
+      if (e.target.files && e.target.files[0]) {
+        selectedSubtitleFile = e.target.files[0];
+        subtitleUrlInput.value = ''; // Limpa URL se selecionou arquivo
+      }
+    }
+
+    function handleSubtitleUrlInput() {
+      if (subtitleUrlInput.value.trim()) {
+        selectedSubtitleFile = null;
+        subtitleFileInput.value = '';
+      }
+    }
+
+    function validateInputs() {
+      const hasFile = !!selectedLocalFile;
+      const hasUrl = !!urlInput.value.trim();
+      btnPlay.disabled = !(hasFile || hasUrl);
+    }
+
+    // RESOLVER LINKS ESPECIAIS (Nuvem)
+    function resolveDirectVideoLink(url) {
+      let resolved = url.trim();
+      
+      // Google Drive
+      if (resolved.includes('drive.google.com')) {
+        const match = resolved.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+          return `https://docs.google.com/uc?export=download&id=${match[1]}`;
+        }
+      }
+      
+      // Dropbox
+      if (resolved.includes('dropbox.com')) {
+        resolved = resolved.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+        resolved = resolved.replace('?dl=0', '');
+        resolved = resolved.replace('&dl=0', '');
+        return resolved;
+      }
+
+      return resolved;
+    }
+
+    function getYouTubeId(url) {
+      const regExp = /^(?:https?:\/\/)?(?:www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
+      const match = url.match(regExp);
+      return (match && match[1]) ? match[1] : null;
+    }
+
+    // CONVERSÃO SRT PARA VTT
+    function convertSrtToVtt(srtText) {
+      let vttText = 'WEBVTT\n\n';
+      let formatted = srtText.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+      vttText += formatted;
+      return vttText;
+    }
+
+    // ABRIR O PLAYER
+    async function startPlayback(e) {
+      e.preventDefault();
+      
+      // 1. Determinar origem
+      if (selectedLocalFile) {
+        videoSource = URL.createObjectURL(selectedLocalFile);
+        videoTitle = selectedLocalFile.name;
+        videoType = 'local';
+      } else {
+        const url = urlInput.value.trim();
+        const ytId = getYouTubeId(url);
+        videoSource = resolveDirectVideoLink(url);
+        videoTitle = ytId ? 'Vídeo do YouTube' : url.split('/').pop() || 'Vídeo Online';
+        videoType = ytId ? 'youtube' : 'url';
+      }
+
+      domVideoTitle.innerText = videoTitle;
+
+      // 2. Tratar legendas
+      if (selectedSubtitleFile) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const text = event.target.result;
+          let vttContent = text;
+          if (selectedSubtitleFile.name.endsWith('.srt')) {
+            vttContent = convertSrtToVtt(text);
+          }
+          const blob = new Blob([vttContent], { type: 'text/vtt' });
+          resolvedSubtitleBlobUrl = URL.createObjectURL(blob);
+          applySubtitleToTrack(resolvedSubtitleBlobUrl);
+        };
+        reader.readAsText(selectedSubtitleFile);
+      } else if (subtitleUrlInput.value.trim()) {
+        applySubtitleToTrack(subtitleUrlInput.value.trim());
+      }
+
+      // 3. Ocultar Home e mostrar Player
+      selectionScreen.classList.add('hidden');
+      playerScreen.classList.remove('hidden');
+      isPlayingMode = true;
+
+      // 4. Iniciar reprodução de acordo com o tipo
+      if (videoType === 'youtube') {
+        mainVideo.classList.add('hidden');
+        ytPlayerWrapper.classList.remove('hidden');
+        initYouTubePlayer(getYouTubeId(urlInput.value.trim()));
+      } else {
+        mainVideo.classList.remove('hidden');
+        ytPlayerWrapper.classList.add('hidden');
+        
+        // Carrega HLS se for .m3u8
+        if (videoSource.includes('.m3u8') && Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(videoSource);
+          hls.attachMedia(mainVideo);
+        } else {
+          mainVideo.src = videoSource;
+        }
+
+        mainVideo.volume = volume;
+        mainVideo.muted = isMuted;
+        mainVideo.loop = isLooping;
+        
+        mainVideo.play().then(() => {
+          setPlayState(true);
+        }).catch(err => {
+          console.error(err);
+          setPlayState(false);
+        });
+      }
+
+      // 5. Iniciar sincronização
+      startSyncInterval();
+      setupControlsAutoHide();
+    }
+
+    function applySubtitleToTrack(srcUrl) {
+      // Remove track anterior se existir
+      const oldTrack = mainVideo.querySelector('track');
+      if (oldTrack) oldTrack.remove();
+
+      const track = document.createElement('track');
+      track.src = srcUrl;
+      track.kind = 'subtitles';
+      track.srclang = 'pt';
+      track.label = 'Português';
+      track.default = true;
+      mainVideo.appendChild(track);
+      
+      document.getElementById('btn-cc').classList.add('text-orange-400');
+    }
+
+    // YOUTUBE PLAYER INTEGRATION
+    function initYouTubePlayer(videoId) {
+      // Carrega API se não estiver carregada
+      if (!window.YT) {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        
+        window.onYouTubeIframeAPIReady = () => createYTPlayerInstance(videoId);
+      } else {
+        createYTPlayerInstance(videoId);
+      }
+    }
+
+    function createYTPlayerInstance(videoId) {
+      if (ytPlayer) {
+        ytPlayer.destroy();
+      }
+
+      ytPlayer = new window.YT.Player('yt-player-container', {
+        videoId: videoId,
+        playerVars: {
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          modestbranding: 1,
+          rel: 0,
+          showinfo: 0,
+          iv_load_policy: 3
+        },
+        events: {
+          onReady: (event) => {
+            event.target.setVolume(volume * 100);
+            if (isMuted) event.target.mute();
+            duration = event.target.getDuration();
+            durationTimeText.innerText = formatTime(duration);
+            event.target.playVideo();
+            setPlayState(true);
+          },
+          onStateChange: (event) => {
+            if (event.data === window.YT.PlayerState.PLAYING) {
+              setPlayState(true);
+            } else if (event.data === window.YT.PlayerState.PAUSED) {
+              setPlayState(false);
+            } else if (event.data === window.YT.PlayerState.ENDED) {
+              if (isLooping) {
+                event.target.playVideo();
+              } else {
+                setPlayState(false);
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // CONTROLES DE REPRODUÇÃO
+    function togglePlay() {
+      if (videoType === 'youtube' && ytPlayer) {
+        if (isPlaying) {
+          ytPlayer.pauseVideo();
+        } else {
+          ytPlayer.playVideo();
+        }
+      } else {
+        if (isPlaying) {
+          mainVideo.pause();
+          setPlayState(false);
+        } else {
+          mainVideo.play().then(() => {
+            setPlayState(true);
+          }).catch(() => setPlayState(false));
+        }
+      }
+    }
+
+    function setPlayState(playing) {
+      isPlaying = playing;
+      const playIcon = document.getElementById('play-icon');
+      if (playing) {
+        playIcon.setAttribute('data-lucide', 'pause');
+        btnPlayPause.setAttribute('title', 'Pausar');
+      } else {
+        playIcon.setAttribute('data-lucide', 'play');
+        btnPlayPause.setAttribute('title', 'Reproduzir');
+      }
+      lucide.createIcons();
+    }
+
+    function skipBackward() {
+      const targetTime = Math.max(currentTime - 10, 0);
+      seekToTime(targetTime);
+    }
+
+    function skipForward() {
+      const targetTime = Math.min(currentTime + 30, duration);
+      seekToTime(targetTime);
+    }
+
+    function skipToStart() {
+      seekToTime(0);
+    }
+
+    function skipToEnd() {
+      seekToTime(Math.max(duration - 1, 0));
+    }
+
+    function seekToTime(time) {
+      if (videoType === 'youtube' && ytPlayer) {
+        ytPlayer.seekTo(time, true);
+      } else {
+        mainVideo.currentTime = time;
+      }
+      currentTime = time;
+      timelineSlider.value = time;
+      currentTimeText.innerText = formatTime(time);
+    }
+
+    function seekVideo(e) {
+      const targetTime = parseFloat(e.target.value);
+      seekToTime(targetTime);
+    }
+
+    // VOLUME
+    function changeVolume(e) {
+      const value = parseFloat(e.target.value);
+      volume = value;
+      isMuted = (value === 0);
+      applyVolume();
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      applyVolume();
+    }
+
+    function applyVolume() {
+      const volumeIcon = document.getElementById('volume-icon');
+      const currentVolume = isMuted ? 0 : volume;
+      
+      volumeSlider.value = currentVolume;
+
+      if (videoType === 'youtube' && ytPlayer) {
+        if (isMuted) {
+          ytPlayer.mute();
+        } else {
+          ytPlayer.unMute();
+          ytPlayer.setVolume(volume * 100);
+        }
+      } else {
+        mainVideo.volume = currentVolume;
+        mainVideo.muted = isMuted;
+      }
+
+      // Altera o ícone do volume
+      if (isMuted || currentVolume === 0) {
+        volumeIcon.setAttribute('data-lucide', 'volume-x');
+      } else if (currentVolume > 0.5) {
+        volumeIcon.setAttribute('data-lucide', 'volume-2');
+      } else {
+        volumeIcon.setAttribute('data-lucide', 'volume-1');
+      }
+      lucide.createIcons();
+    }
+
+    // LOOP
+    function toggleLoop() {
+      isLooping = !isLooping;
+      const btnLoop = document.getElementById('btn-loop');
+      const loopSlash = document.getElementById('loop-slash');
+      
+      if (isLooping) {
+        btnLoop.classList.remove('text-zinc-500');
+        btnLoop.classList.add('text-orange-500');
+        btnLoop.setAttribute('data-tooltip', 'Repetir Vídeo Ligado');
+        loopSlash.classList.add('hidden');
+      } else {
+        btnLoop.classList.remove('text-orange-500');
+        btnLoop.classList.add('text-zinc-500');
+        btnLoop.setAttribute('data-tooltip', 'Repetir Vídeo Desligado');
+        loopSlash.classList.remove('hidden');
+      }
+
+      if (videoType !== 'youtube') {
+        mainVideo.loop = isLooping;
+      }
+    }
+
+    // SHUFFLE
+    function toggleShuffle() {
+      isShuffle = !isShuffle;
+      const btnShuffle = document.getElementById('btn-shuffle');
+      const shuffleSlash = document.getElementById('shuffle-slash');
+
+      if (isShuffle) {
+        btnShuffle.classList.remove('text-zinc-500');
+        btnShuffle.classList.add('text-orange-500');
+        btnShuffle.setAttribute('data-tooltip', 'Modo Aleatório Ligado');
+        shuffleSlash.classList.add('hidden');
+      } else {
+        btnShuffle.classList.remove('text-orange-500');
+        btnShuffle.classList.add('text-zinc-500');
+        btnShuffle.setAttribute('data-tooltip', 'Modo Aleatório Desligado');
+        shuffleSlash.classList.remove('hidden');
+      }
+    }
+
+    // LEGENDAS
+    function toggleSubtitles() {
+      if (videoType === 'youtube') {
+        alert("As legendas externas locais não são suportadas com vídeos do YouTube.");
+        return;
+      }
+      
+      const track = mainVideo.textTracks[0];
+      if (!track) {
+        alert("Nenhuma legenda foi carregada. Adicione uma legenda SRT ou VTT na página inicial.");
+        return;
+      }
+
+      const btnCc = document.getElementById('btn-cc');
+      if (track.mode === 'showing') {
+        track.mode = 'hidden';
+        btnCc.classList.remove('text-orange-400');
+        btnCc.classList.add('text-zinc-400');
+      } else {
+        track.mode = 'showing';
+        btnCc.classList.add('text-orange-400');
+        btnCc.classList.remove('text-zinc-400');
+      }
+    }
+
+    // PICTURE IN PICTURE
+    async function togglePictureInPicture() {
+      if (videoType === 'youtube') {
+        alert("O player do YouTube não suporta Picture-in-Picture.");
+        return;
+      }
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else {
+          await mainVideo.requestPictureInPicture();
+        }
+      } catch (err) {
+        console.error("Falha ao ativar Picture-in-Picture", err);
+      }
+    }
+
+    // FULLSCREEN
+    function toggleFullscreen() {
+      const container = document.getElementById('player-screen');
+      const icon = document.getElementById('fullscreen-icon');
+      
+      if (!document.fullscreenElement) {
+        container.requestFullscreen().then(() => {
+          isFullscreen = true;
+          icon.setAttribute('data-lucide', 'minimize');
+          lucide.createIcons();
+        }).catch(err => console.error(err));
+      } else {
+        document.exitFullscreen().then(() => {
+          isFullscreen = false;
+          icon.setAttribute('data-lucide', 'maximize');
+          lucide.createIcons();
+        }).catch(err => console.error(err));
+      }
+    }
+
+    // MONITOR DE FULLSCREEN NATIVO
+    document.addEventListener('fullscreenchange', () => {
+      isFullscreen = !!document.fullscreenElement;
+      const icon = document.getElementById('fullscreen-icon');
+      if (isFullscreen) {
+        icon.setAttribute('data-lucide', 'minimize');
+      } else {
+        icon.setAttribute('data-lucide', 'maximize');
+      }
+      lucide.createIcons();
+    });
+
+    // SAIR DO PLAYER
+    function backToHome() {
+      isPlayingMode = false;
+      selectionScreen.classList.remove('hidden');
+      playerScreen.classList.add('hidden');
+      
+      if (syncInterval) clearInterval(syncInterval);
+      
+      if (videoSource.startsWith('blob:')) {
+        URL.revokeObjectURL(videoSource);
+      }
+      if (resolvedSubtitleBlobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(resolvedSubtitleBlobUrl);
+      }
+
+      // Parar reprodução
+      if (videoType === 'youtube' && ytPlayer) {
+        ytPlayer.destroy();
+        ytPlayer = null;
+      } else {
+        mainVideo.pause();
+        mainVideo.src = '';
+      }
+
+      videoSource = '';
+      videoTitle = 'Reprodutor de Vídeo';
+      videoType = null;
+      isPlaying = false;
+      currentTime = 0;
+      duration = 0;
+      selectedLocalFile = null;
+      selectedSubtitleFile = null;
+      resolvedSubtitleBlobUrl = '';
+      
+      // Reseta inputs
+      localVideoFileInput.value = '';
+      subtitleFileInput.value = '';
+      subtitleUrlInput.value = '';
+      urlInput.value = '';
+      document.getElementById('upload-icon').classList.remove('text-orange-500');
+      dropzone.classList.remove('border-orange-500', 'bg-orange-950/10');
+      document.getElementById('upload-text').innerHTML = `
+        <p class="text-sm font-medium text-zinc-300">Escolha ou solte um arquivo de vídeo</p>
+        <p class="text-xs text-zinc-500 mt-1">MP4, WebM, MKV, AVI, etc. (Sem limite de tamanho)</p>
+      `;
+      document.getElementById('btn-cc').classList.remove('text-orange-400');
+      document.getElementById('btn-cc').classList.add('text-zinc-400');
+      validateInputs();
+    }
+
+    // SINCRONIZAR TIMELINE
+    function startSyncInterval() {
+      if (syncInterval) clearInterval(syncInterval);
+      
+      syncInterval = setInterval(() => {
+        if (!isPlayingMode) return;
+
+        if (videoType === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) {
+          currentTime = ytPlayer.getCurrentTime();
+          duration = ytPlayer.getDuration() || 0;
+        } else if (videoType !== 'youtube' && mainVideo) {
+          currentTime = mainVideo.currentTime;
+          duration = mainVideo.duration || 0;
+        }
+
+        // Atualiza timeline
+        timelineSlider.value = currentTime;
+        timelineSlider.max = duration || 100;
+        
+        currentTimeText.innerText = formatTime(currentTime);
+        durationTimeText.innerText = formatTime(duration);
+      }, 250);
+    }
+
+    // ESCONDER CONTROLES AUTOMATICAMENTE
+    function setupControlsAutoHide() {
+      const controls = document.getElementById('player-controls');
+      const clickOverlay = document.getElementById('click-overlay');
+      const meetTip = document.getElementById('meet-tip-btn');
+      const backBtn = document.getElementById('back-btn');
+
+      const hideControls = () => {
+        if (isPlaying) {
+          controls.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+          meetTip.classList.add('opacity-0', '-translate-y-2', 'pointer-events-none');
+          backBtn.classList.add('opacity-0', '-translate-y-2', 'pointer-events-none');
+        }
+      };
+
+      const showControls = () => {
+        controls.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        meetTip.classList.remove('opacity-0', '-translate-y-2', 'pointer-events-none');
+        backBtn.classList.remove('opacity-0', '-translate-y-2', 'pointer-events-none');
+        
+        if (controlsTimeout) clearTimeout(controlsTimeout);
+        
+        if (isPlaying) {
+          controlsTimeout = setTimeout(hideControls, 3000);
+        }
+      };
+
+      window.addEventListener('mousemove', showControls);
+      
+      // Atualizar se pausar
+      mainVideo.addEventListener('pause', showControls);
+      mainVideo.addEventListener('play', showControls);
+    }
+
+    // ATALHOS DE TECLADO
+    window.addEventListener('keydown', (e) => {
+      if (!isPlayingMode) return;
+      if (document.activeElement.tagName === 'INPUT') return;
+
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          skipBackward();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          skipForward();
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          const nextVolUp = Math.min(volume + 0.05, 1);
+          volume = nextVolUp;
+          isMuted = false;
+          applyVolume();
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          const nextVolDown = Math.max(volume - 0.05, 0);
+          volume = nextVolDown;
+          applyVolume();
+          break;
+        case 'KeyM':
+          e.preventDefault();
+          toggleMute();
+          break;
+        case 'KeyF':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case 'KeyP':
+          e.preventDefault();
+          togglePictureInPicture();
+          break;
+      }
+    });
+
+    // FORMATAR SEGUNDOS PARA STRING (hh:mm:ss)
+    function formatTime(seconds) {
+      if (isNaN(seconds)) return '00:00';
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      
+      const formattedMins = mins < 10 ? `0${mins}` : mins;
+      const formattedSecs = secs < 10 ? `0${secs}` : secs;
+
+      if (hrs > 0) {
+        const formattedHrs = hrs < 10 ? `0${hrs}` : hrs;
+        return `${formattedHrs}:${formattedMins}:${formattedSecs}`;
+      }
+      return `${formattedMins}:${formattedSecs}`;
+    }
+
+    // MODAL DO GOOGLE MEET
+    function openMeetHelp() {
+      meetHelpModal.classList.remove('hidden');
+    }
+
+    function closeMeetHelp() {
+      meetHelpModal.classList.add('hidden');
+    }
+  </script>
+</body>
 </html>
