@@ -24,6 +24,12 @@
   <!-- CryptoJS para cálculo do Hash MD5 do SubDB -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
+  <!-- Polyfill de Buffer para matroska-subtitles funcionar no browser -->
+  <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/dist/buffer.min.js"></script>
+  <script>
+    window.Buffer = window.Buffer || buffer.Buffer;
+  </script>
+
   <!-- Matroska Subtitles CDN para extrair legendas embutidas em MKV/WebM -->
   <script src="https://cdn.jsdelivr.net/npm/matroska-subtitles@3.x/dist/matroska-subtitles.min.js"></script>
 
@@ -66,17 +72,35 @@
       outline: none;
     }
 
-    /* Custom Play Button Gradient */
-    .play-btn-gradient-border {
-      background: linear-gradient(#0c0c0e, #0c0c0e) padding-box,
-                  linear-gradient(135deg, #f97316, #d946ef) border-box;
-      border: 3px solid transparent;
+    /* Animação do volume expansível no hover */
+    .volume-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 8px;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .play-btn-gradient-border:hover {
-      transform: scale(1.08);
-      box-shadow: 0 0 20px rgba(217, 70, 239, 0.45);
+    .volume-container:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(217, 70, 239, 0.4);
+    }
+
+    .volume-range-custom {
+      width: 0px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .volume-container:hover .volume-range-custom,
+    .volume-range-custom:focus {
+      width: 70px;
+      opacity: 1;
+      pointer-events: auto;
     }
 
     /* Pastilha Glassmorphic para botões secundários (Nova Interface) */
@@ -447,111 +471,105 @@
               <span class="text-[7px] font-extrabold absolute bottom-1 text-zinc-400">10s</span>
             </button>
 
-            <!-- Botão 2: Play/Pause Centralizado (Bola com Borda Gradiente - Sem desalinhamento) -->
+            <!-- Botão 2: Play/Pause Centralizado (Estilo Pastilha de Vidro - Sem Bola de Borda Gradiente) -->
             <button 
               onclick="togglePlay()"
               id="btn-play-pause"
-              class="w-12 h-12 rounded-full flex items-center justify-center play-btn-gradient-border text-white shadow-xl cursor-pointer"
+              class="btn-secondary-custom w-12 h-10 flex items-center justify-center text-white shadow-xl cursor-pointer"
               title="Reproduzir"
             >
               <i data-lucide="play" id="play-icon" class="w-5 h-5 fill-white translate-x-[1.5px]"></i>
             </button>
+ 
+             <!-- Botão 3: Avançar 30s (Nova Interface Pastilha) -->
+             <button 
+               onclick="skipForward()"
+               class="btn-secondary-custom w-12 h-10 flex flex-col items-center justify-center relative cursor-pointer"
+               title="Avançar 30s"
+             >
+               <i data-lucide="rotate-cw" class="w-4 h-4 text-zinc-300"></i>
+               <span class="text-[7px] font-extrabold absolute bottom-1 text-zinc-400">30s</span>
+             </button>
+ 
+             <!-- Botão 4: Repetir / Loop (Nova Interface Pastilha) -->
+             <button 
+               id="btn-loop"
+               onclick="toggleLoop()"
+               class="tooltip btn-secondary-custom w-12 h-10 flex items-center justify-center cursor-pointer text-zinc-300"
+               data-tooltip="Repetir Vídeo Desligado"
+             >
+               <div class="relative flex items-center justify-center">
+                 <i data-lucide="repeat" class="w-4 h-4"></i>
+                 <div id="loop-slash" class="absolute inset-0 flex items-center justify-center">
+                   <div class="w-[16px] h-[1.5px] bg-zinc-400 rotate-45"></div>
+                 </div>
+               </div>
+             </button>
+           </div>
+ 
+           <!-- LADO DIREITO: CC/Idioma (Unificados), Volume Animado, Fullscreen, PiP (Sem os 3 pontinhos) -->
+           <div class="flex items-center gap-2.5 relative">
+             
+             <!-- Botão 5: Legendas / CC & Idioma com menu suspenso unificado -->
+             <div class="relative">
+               <button 
+                 id="btn-cc"
+                 onclick="toggleSubtitleMenu(event)"
+                 class="btn-secondary-custom w-10 h-10 flex items-center justify-center text-zinc-400 cursor-pointer"
+                 title="Configurações de Áudio e Legenda"
+               >
+                 <i data-lucide="subtitles" class="w-4.5 h-4.5"></i>
+               </button>
+               
+               <!-- Menu suspenso de Mídia Unificado (Idiomas e Legendas) -->
+               <div 
+                 id="subtitle-dropdown" 
+                 class="hidden absolute bottom-12 right-0 w-60 bg-zinc-950/95 border border-white/10 rounded-xl p-3 shadow-2xl flex flex-col gap-3.5 z-40"
+               >
+                 <!-- Seção: Idioma do Áudio -->
+                 <div>
+                   <div class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider px-1 pb-1.5 border-b border-white/5 flex items-center gap-1.5">
+                     <i data-lucide="music" class="w-3.5 h-3.5 text-zinc-400"></i>
+                     <span>Idioma do Áudio</span>
+                   </div>
+                   <div id="audio-menu-options" class="flex flex-col gap-1 max-h-32 overflow-y-auto mt-1.5">
+                     <!-- Injetado dinamicamente -->
+                   </div>
+                 </div>
 
-            <!-- Botão 3: Avançar 30s (Nova Interface Pastilha) -->
-            <button 
-              onclick="skipForward()"
-              class="btn-secondary-custom w-12 h-10 flex flex-col items-center justify-center relative cursor-pointer"
-              title="Avançar 30s"
-            >
-              <i data-lucide="rotate-cw" class="w-4 h-4 text-zinc-300"></i>
-              <span class="text-[7px] font-extrabold absolute bottom-1 text-zinc-400">30s</span>
-            </button>
-
-            <!-- Botão 4: Repetir / Loop (Nova Interface Pastilha) -->
-            <button 
-              id="btn-loop"
-              onclick="toggleLoop()"
-              class="tooltip btn-secondary-custom w-12 h-10 flex items-center justify-center cursor-pointer text-zinc-300"
-              data-tooltip="Repetir Vídeo Desligado"
-            >
-              <div class="relative flex items-center justify-center">
-                <i data-lucide="repeat" class="w-4 h-4"></i>
-                <div id="loop-slash" class="absolute inset-0 flex items-center justify-center">
-                  <div class="w-[16px] h-[1.5px] bg-zinc-400 rotate-45"></div>
-                </div>
-              </div>
-            </button>
-          </div>
-
-          <!-- LADO DIREITO: CC, Áudio, Volume, Fullscreen, PiP (Sem os 3 pontinhos) -->
-          <div class="flex items-center gap-2.5 relative">
-            
-            <!-- Botão 5: Legendas / CC com menu suspenso -->
-            <div class="relative">
-              <button 
-                id="btn-cc"
-                onclick="toggleSubtitleMenu(event)"
-                class="btn-secondary-custom w-10 h-10 flex items-center justify-center text-zinc-400 cursor-pointer"
-                title="Configurações de Legendas"
-              >
-                <i data-lucide="subtitles" class="w-4.5 h-4.5"></i>
-              </button>
-              
-              <!-- Menu suspenso de Legendas (Embutidas e Externas) -->
-              <div 
-                id="subtitle-dropdown" 
-                class="hidden absolute bottom-12 right-0 w-52 bg-zinc-950/95 border border-white/10 rounded-xl p-2 shadow-2xl flex flex-col gap-1 z-40"
-              >
-                <div class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider px-2 py-1 border-b border-white/5">Legendas</div>
-                <div id="subtitle-menu-options" class="flex flex-col gap-1 max-h-40 overflow-y-auto mt-1">
-                  <!-- Injetado dinamicamente -->
-                </div>
-              </div>
-            </div>
-
-            <!-- Botão 6: Menu de Trilhas de Áudio Embutidas (MKV/MP4) -->
-            <div class="relative">
-              <button 
-                id="btn-audio"
-                onclick="toggleAudioMenu(event)"
-                class="btn-secondary-custom w-10 h-10 flex items-center justify-center text-zinc-400 cursor-pointer"
-                title="Trilhas de Áudio"
-              >
-                <i data-lucide="music" class="w-4.5 h-4.5"></i>
-              </button>
-              
-              <!-- Menu suspenso de Áudios -->
-              <div 
-                id="audio-dropdown" 
-                class="hidden absolute bottom-12 right-0 w-52 bg-zinc-950/95 border border-white/10 rounded-xl p-2 shadow-2xl flex flex-col gap-1 z-40"
-              >
-                <div class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider px-2 py-1 border-b border-white/5">Idioma do Áudio</div>
-                <div id="audio-menu-options" class="flex flex-col gap-1 max-h-40 overflow-y-auto mt-1">
-                  <!-- Injetado dinamicamente -->
-                </div>
-              </div>
-            </div>
-
-            <!-- Botão 7: Volume com Slider -->
-            <div class="flex items-center gap-2 bg-zinc-900/60 border border-white/5 hover:border-white/10 px-2 py-1 rounded-xl transition-all duration-300">
-              <button 
-                onclick="toggleMute()"
-                class="text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                title="Mudo (M)"
-              >
-                <i data-lucide="volume-2" id="volume-icon" class="w-4.5 h-4.5"></i>
-              </button>
-              <input
-                type="range"
-                id="volume-slider"
-                min="0"
-                max="1"
-                step="0.05"
-                value="0.8"
-                oninput="changeVolume(event)"
-                class="volume-range w-0 group-hover/volume:w-16 focus:w-16 transition-all duration-300 origin-left"
-              />
-            </div>
+                 <!-- Seção: Legendas -->
+                 <div>
+                   <div class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider px-1 pb-1.5 border-b border-white/5 flex items-center gap-1.5">
+                     <i data-lucide="subtitles" class="w-3.5 h-3.5 text-zinc-400"></i>
+                     <span>Legendas (CC)</span>
+                   </div>
+                   <div id="subtitle-menu-options" class="flex flex-col gap-1 max-h-32 overflow-y-auto mt-1.5">
+                     <!-- Injetado dinamicamente -->
+                   </div>
+                 </div>
+               </div>
+             </div>
+ 
+             <!-- Botão 7: Volume com Slider Animado no Hover -->
+             <div class="volume-container">
+               <button 
+                 onclick="toggleMute()"
+                 class="text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                 title="Mudo (M)"
+               >
+                 <i data-lucide="volume-2" id="volume-icon" class="w-4.5 h-4.5"></i>
+               </button>
+               <input
+                 type="range"
+                 id="volume-slider"
+                 min="0"
+                 max="1"
+                 step="0.05"
+                 value="0.8"
+                 oninput="changeVolume(event)"
+                 class="volume-range volume-range-custom"
+               />
+             </div>
 
             <!-- Botão 8: Picture-in-Picture -->
             <button 
@@ -1212,15 +1230,7 @@
       setTimeout(refreshAudioMenu, 1000);
     }
 
-    function toggleAudioMenu(e) {
-      e.stopPropagation();
-      subtitleDropdown.classList.add('hidden'); // fecha legendas
-      audioDropdown.classList.toggle('hidden');
-    }
 
-    window.addEventListener('click', () => {
-      audioDropdown.classList.add('hidden');
-    });
 
     function refreshAudioMenu() {
       if (!isPlayingMode || videoType === 'youtube') return;
@@ -1337,10 +1347,9 @@
       mainVideo.appendChild(track);
     }
 
-    // MENU DE SELEÇÃO DINÂMICA DE LEGENDAS
+    // MENU DE SELEÇÃO DINÂMICA DE LEGENDAS E IDIOMAS UNIFICADOS
     function toggleSubtitleMenu(e) {
       e.stopPropagation();
-      audioDropdown.classList.add('hidden'); // fecha áudios
       subtitleDropdown.classList.toggle('hidden');
     }
 
@@ -1743,7 +1752,6 @@
           controls.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
           backBtn.classList.add('opacity-0', '-translate-y-2', 'pointer-events-none');
           subtitleDropdown.classList.add('hidden');
-          audioDropdown.classList.add('hidden');
         }
       };
 
