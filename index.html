@@ -21,6 +21,9 @@
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
+  <!-- CryptoJS para cálculo do Hash MD5 do SubDB -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -41,9 +44,9 @@
     
     /* Glassmorphism Panel */
     .glass-panel {
-      background: rgba(15, 15, 20, 0.7);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: rgba(12, 12, 16, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
@@ -62,15 +65,29 @@
 
     /* Custom Play Button Gradient */
     .play-btn-gradient-border {
-      background: linear-gradient(#18181b, #18181b) padding-box,
+      background: linear-gradient(#0c0c0e, #0c0c0e) padding-box,
                   linear-gradient(135deg, #f97316, #d946ef) border-box;
       border: 3px solid transparent;
-      transition: all 0.3s ease;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .play-btn-gradient-border:hover {
       transform: scale(1.08);
-      box-shadow: 0 0 15px rgba(249, 115, 22, 0.4);
+      box-shadow: 0 0 20px rgba(249, 115, 22, 0.45);
+    }
+
+    /* Round Secondary Buttons style */
+    .btn-secondary-round {
+      background: rgba(24, 24, 27, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-secondary-round:hover {
+      background: rgba(39, 39, 42, 0.8);
+      border-color: rgba(255, 255, 255, 0.15);
+      color: #f97316;
+      transform: scale(1.05);
     }
 
     /* Video Player Timeline styling */
@@ -79,7 +96,7 @@
       appearance: none;
       width: 100%;
       height: 4px;
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.15);
       border-radius: 2px;
       outline: none;
       cursor: pointer;
@@ -233,8 +250,14 @@
           Reproduza qualquer vídeo online
         </h2>
         <p class="text-sm text-zinc-400 mt-2 max-w-md mx-auto">
-          Arraste um vídeo local (sem limite de tamanho) ou insira links direto no navegador. Funciona por clique duplo direto no arquivo index.html!
+          Arraste um vídeo local (sem limite de tamanho) ou insira URLs de transmissão direto no navegador. Funciona por clique duplo direto no arquivo index.html!
         </p>
+      </div>
+
+      <!-- Notificação de Legendas Encontradas -->
+      <div id="subtitle-notification" class="hidden mb-6 px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-medium flex items-center gap-2">
+        <i data-lucide="info" class="w-4 h-4 shrink-0"></i>
+        <span id="subtitle-notification-text">Legenda automática carregada via SubDB.</span>
       </div>
 
       <form onsubmit="startPlayback(event)" class="space-y-6">
@@ -257,7 +280,7 @@
             <i data-lucide="upload" id="upload-icon" class="w-8 h-8 mx-auto mb-3 text-zinc-500"></i>
             <div id="upload-text">
               <p class="text-sm font-medium text-zinc-300">Escolha ou solte um arquivo de vídeo</p>
-              <p class="text-xs text-zinc-500 mt-1">MP4, WebM, MKV, AVI, etc. (Sem limite de tamanho)</p>
+              <p class="text-xs text-zinc-500 mt-1">MP4, WebM, MKV, AVI, etc. (Busca legenda no SubDB automaticamente)</p>
             </div>
           </div>
         </div>
@@ -271,7 +294,7 @@
 
         <!-- SEÇÃO DE LINK ONLINE -->
         <div class="space-y-2">
-          <label class="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Link do Vídeo na Web</label>
+          <label class="text-xs font-bold text-zinc-300 uppercase tracking-wider block">URL do Vídeo ou Streaming</label>
           <div class="relative">
             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <i data-lucide="link" class="h-5 w-5 text-zinc-500"></i>
@@ -279,13 +302,13 @@
             <input
               type="url"
               id="url-input"
-              placeholder="https://exemplo.com/filme.mp4 ou link do YouTube"
+              placeholder="https://exemplo.com/video.mp4 ou URL de transmissão/streaming"
               oninput="handleUrlInput()"
               class="w-full pl-11 pr-4 py-3.5 text-sm rounded-2xl glass-input text-white font-medium"
             />
           </div>
           <p class="text-[11px] text-zinc-500">
-            Suporta arquivos diretos de nuvem (Google Drive, Dropbox) e streams de vídeo.
+            Suporta arquivos de nuvem (Google Drive, Dropbox) e links de transmissão/m3u8.
           </p>
         </div>
 
@@ -293,7 +316,7 @@
         <div class="bg-zinc-950/30 border border-zinc-900 rounded-2xl p-4 space-y-4">
           <div class="flex items-center gap-2">
             <i data-lucide="subtitles" class="w-4.5 h-4.5 text-zinc-400"></i>
-            <h3 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Legendas / CC (Opcional)</h3>
+            <h3 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Legendas / CC Manual (Opcional)</h3>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -349,10 +372,10 @@
           playsinline
           onclick="togglePlay()"
         >
-          <!-- Legendas serão injetadas aqui -->
+          <!-- Legendas serão injetadas dinamicamente -->
         </video>
 
-        <!-- Elemento de Vídeo YouTube (Iframe API) -->
+        <!-- Elemento de Vídeo YouTube (Iframe API, mantido no código apenas como fallback silencioso) -->
         <div id="yt-player-wrapper" class="hidden w-full h-full pointer-events-none select-none">
           <div id="yt-player-container" class="w-full h-full"></div>
         </div>
@@ -368,7 +391,7 @@
         <div id="meet-tip-btn" class="absolute top-6 left-6 transition-all duration-300 z-20">
           <button
             onclick="event.stopPropagation(); openMeetHelp()"
-            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-950/80 text-orange-400 border border-orange-500/30 hover:bg-zinc-900 cursor-pointer"
+            class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-950/80 text-orange-400 border border-orange-500/20 hover:bg-zinc-900 cursor-pointer hover:scale-105 transition-all duration-300"
           >
             <i data-lucide="circle-help" class="w-3.5 h-3.5"></i>
             <span>Transmitindo no Meet?</span>
@@ -379,7 +402,7 @@
         <div id="back-btn" class="absolute top-6 right-6 transition-all duration-300 z-20">
           <button
             onclick="event.stopPropagation(); backToHome()"
-            class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-zinc-950/80 hover:bg-zinc-900 text-white border border-zinc-800 cursor-pointer"
+            class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-zinc-950/80 hover:bg-zinc-900 text-white border border-zinc-800 cursor-pointer hover:scale-105 transition-all duration-300"
           >
             <i data-lucide="arrow-left" class="w-4 h-4"></i>
             <span>Sair</span>
@@ -387,10 +410,10 @@
         </div>
       </div>
 
-      <!-- PAINEL DE CONTROLES CUSTOMIZADOS (Estilo Imagem) -->
+      <!-- PAINEL DE CONTROLES CUSTOMIZADOS (Estilo Cápsula Flutuante, sem parecer com a imagem original) -->
       <div 
         id="player-controls"
-        class="w-full bg-gradient-to-t from-zinc-950/95 via-zinc-950/90 to-zinc-950/0 px-6 pb-6 pt-10 absolute bottom-0 left-0 right-0 z-30 transition-all duration-300 flex flex-col gap-4 select-none"
+        class="w-[94%] bg-zinc-950/90 border border-white/10 backdrop-blur-lg rounded-2xl px-6 py-4 absolute bottom-4 left-1/2 -translate-x-1/2 z-30 transition-all duration-300 flex flex-col gap-3.5 select-none shadow-2xl"
       >
         <!-- TIMELINE (Timeline com thumb laranja) -->
         <div class="w-full flex items-center gap-3 timeline-container">
@@ -417,51 +440,27 @@
         <div class="w-full flex items-center justify-between">
           
           <!-- LADO ESQUERDO: Título -->
-          <div class="max-w-[30%] truncate">
+          <div class="max-w-[35%] truncate">
             <h3 id="video-title" class="text-sm font-bold text-white tracking-wide truncate">
               Título do Vídeo
             </h3>
             <p class="text-[10px] text-zinc-500 font-medium">MeetPlayer Premium</p>
           </div>
 
-          <!-- CENTRO: Controles Mapeados da Imagem -->
+          <!-- CENTRO: Controles Reestilizados (Sem aleatório, sem início e sem fim) -->
           <div class="flex items-center gap-4">
             
-            <!-- Botão 1: Alternar Ordem / Shuffle (com barra de desativado) -->
-            <button 
-              id="btn-shuffle"
-              onclick="toggleShuffle()"
-              class="tooltip p-2 rounded-lg transition-colors cursor-pointer text-zinc-500 hover:text-zinc-300"
-              data-tooltip="Modo Aleatório Desligado"
-            >
-              <div class="relative">
-                <i data-lucide="shuffle" class="w-4 h-4"></i>
-                <div id="shuffle-slash" class="absolute inset-0 flex items-center justify-center">
-                  <div class="w-[18px] h-[1.5px] bg-zinc-500 rotate-45"></div>
-                </div>
-              </div>
-            </button>
-
-            <!-- Botão 2: Voltar ao Início (|<) -->
-            <button 
-              onclick="skipToStart()"
-              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-              title="Voltar ao Início"
-            >
-              <i data-lucide="skip-back" class="w-4 h-4"></i>
-            </button>
-
-            <!-- Botão 3: Voltar 10s -->
+            <!-- Botão 1: Voltar 10s (Redondo escuro) -->
             <button 
               onclick="skipBackward()"
-              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer flex flex-col items-center justify-center relative"
+              class="btn-secondary-round w-9 h-9 rounded-full flex flex-col items-center justify-center relative cursor-pointer"
               title="Voltar 10s"
             >
               <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-              <span class="text-[7px] font-bold absolute top-[11px] text-zinc-300">10</span>
+              <span class="text-[6px] font-extrabold absolute top-[18px] text-zinc-300">10</span>
             </button>
 
-            <!-- Botão 4: Play/Pause Centralizado (Borda com Gradiente Colorido) -->
+            <!-- Botão 2: Play/Pause Centralizado (Destacado com Gradiente) -->
             <button 
               onclick="togglePlay()"
               id="btn-play-pause"
@@ -471,62 +470,66 @@
               <i data-lucide="play" id="play-icon" class="w-5 h-5 translate-x-[1.5px] fill-white"></i>
             </button>
 
-            <!-- Botão 5: Avançar 30s -->
+            <!-- Botão 3: Avançar 30s (Redondo escuro) -->
             <button 
               onclick="skipForward()"
-              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer flex flex-col items-center justify-center relative"
+              class="btn-secondary-round w-9 h-9 rounded-full flex flex-col items-center justify-center relative cursor-pointer"
               title="Avançar 30s"
             >
               <i data-lucide="rotate-cw" class="w-4 h-4"></i>
-              <span class="text-[7px] font-bold absolute top-[11px] text-zinc-300">30</span>
+              <span class="text-[6px] font-extrabold absolute top-[18px] text-zinc-300">30</span>
             </button>
 
-            <!-- Botão 6: Avançar ao Fim (>|) -->
-            <button 
-              onclick="skipToEnd()"
-              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-              title="Avançar ao Fim"
-            >
-              <i data-lucide="skip-forward" class="w-4 h-4"></i>
-            </button>
-
-            <!-- Botão 7: Repetir / Loop (com barra de desativado) -->
+            <!-- Botão 4: Repetir / Loop (Redondo escuro com barra) -->
             <button 
               id="btn-loop"
               onclick="toggleLoop()"
-              class="tooltip p-2 rounded-lg transition-colors cursor-pointer text-zinc-500 hover:text-zinc-300"
+              class="tooltip btn-secondary-round w-9 h-9 rounded-full flex items-center justify-center cursor-pointer text-zinc-400"
               data-tooltip="Repetir Vídeo Desligado"
             >
-              <div class="relative">
+              <div class="relative flex items-center justify-center">
                 <i data-lucide="repeat" class="w-4 h-4"></i>
                 <div id="loop-slash" class="absolute inset-0 flex items-center justify-center">
-                  <div class="w-[18px] h-[1.5px] bg-zinc-500 rotate-45"></div>
+                  <div class="w-[16px] h-[1.5px] bg-zinc-400 rotate-45"></div>
                 </div>
               </div>
             </button>
           </div>
 
           <!-- LADO DIREITO: CC, Volume, Fullscreen, PiP (Sem os 3 pontinhos) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2.5 relative">
             
-            <!-- Botão 8: Legendas / CC -->
-            <button 
-              id="btn-cc"
-              onclick="toggleSubtitles()"
-              class="p-2 rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
-              title="Status das Legendas"
-            >
-              <i data-lucide="subtitles" class="w-4.5 h-4.5"></i>
-            </button>
+            <!-- Botão 5: Legendas / CC com menu suspenso -->
+            <div class="relative">
+              <button 
+                id="btn-cc"
+                onclick="toggleSubtitleMenu(event)"
+                class="btn-secondary-round w-9 h-9 rounded-full flex items-center justify-center text-zinc-400 cursor-pointer"
+                title="Configurações de Legendas"
+              >
+                <i data-lucide="subtitles" class="w-4.5 h-4.5"></i>
+              </button>
+              
+              <!-- Menu suspenso de Legendas (Embutidas e Externas) -->
+              <div 
+                id="subtitle-dropdown" 
+                class="hidden absolute bottom-12 right-0 w-52 bg-zinc-950/95 border border-white/10 rounded-xl p-2 shadow-2xl flex flex-col gap-1 z-40"
+              >
+                <div class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider px-2 py-1 border-b border-white/5">Legendas</div>
+                <div id="subtitle-menu-options" class="flex flex-col gap-1 max-h-40 overflow-y-auto mt-1">
+                  <!-- Injetado dinamicamente -->
+                </div>
+              </div>
+            </div>
 
-            <!-- Botão 9: Volume com Slider -->
-            <div class="flex items-center gap-2 group/volume">
+            <!-- Botão 6: Volume com Slider -->
+            <div class="flex items-center gap-2 group/volume bg-zinc-900/60 border border-white/5 hover:border-white/10 px-2 py-1 rounded-full transition-all duration-300">
               <button 
                 onclick="toggleMute()"
-                class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                class="text-zinc-400 hover:text-white transition-colors cursor-pointer"
                 title="Mudo (M)"
               >
-                <i data-lucide="volume-2" id="volume-icon" class="w-4.5 h-4.5"></i>
+                <i data-lucide="volume-2" id="volume-icon" class="w-4 h-4"></i>
               </button>
               <input
                 type="range"
@@ -540,22 +543,22 @@
               />
             </div>
 
-            <!-- Botão 10: Picture-in-Picture -->
+            <!-- Botão 7: Picture-in-Picture -->
             <button 
               onclick="togglePictureInPicture()"
-              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              class="btn-secondary-round w-9 h-9 rounded-full flex items-center justify-center text-zinc-400 cursor-pointer"
               title="Picture-in-Picture (P)"
             >
-              <i data-lucide="picture-in-picture-2" class="w-4.5 h-4.5"></i>
+              <i data-lucide="picture-in-picture-2" class="w-4 h-4"></i>
             </button>
 
-            <!-- Botão 11: Tela Cheia -->
+            <!-- Botão 8: Tela Cheia -->
             <button 
               onclick="toggleFullscreen()"
-              class="p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              class="btn-secondary-round w-9 h-9 rounded-full flex items-center justify-center text-zinc-400 cursor-pointer"
               title="Tela Cheia (F)"
             >
-              <i data-lucide="maximize" id="fullscreen-icon" class="w-4.5 h-4.5"></i>
+              <i data-lucide="maximize" id="fullscreen-icon" class="w-4 h-4"></i>
             </button>
           </div>
         </div>
@@ -621,7 +624,6 @@
 
   <!-- SCRIPT DE LÓGICA DO PLAYER (Vanilla JS) -->
   <script>
-    // Configura o ano dinamicamente no footer
     document.getElementById('year').innerText = new Date().getFullYear();
 
     // VARIÁVEIS DE ESTADO GLOBAL
@@ -634,7 +636,6 @@
     let volume = 0.8;
     let isMuted = false;
     let isLooping = false;
-    let isShuffle = false;
     let isFullscreen = false;
     let currentTime = 0;
     let duration = 0;
@@ -643,6 +644,7 @@
     let selectedSubtitleFile = null;
     let subtitleUrl = '';
     let resolvedSubtitleBlobUrl = '';
+    let subDbSubtitleUrl = '';
 
     // Elementos da DOM
     const selectionScreen = document.getElementById('selection-screen');
@@ -662,6 +664,8 @@
     const currentTimeText = document.getElementById('current-time-text');
     const durationTimeText = document.getElementById('duration-time-text');
     const volumeSlider = document.getElementById('volume-slider');
+    const subtitleDropdown = document.getElementById('subtitle-dropdown');
+    const subtitleMenuOptions = document.getElementById('subtitle-menu-options');
     
     // Controles do Google Meet
     const meetHelpModal = document.getElementById('meet-help-modal');
@@ -698,7 +702,7 @@
       }
     }
 
-    function setLocalFile(file) {
+    async function setLocalFile(file) {
       selectedLocalFile = file;
       urlInput.value = ''; // limpa link externo
       
@@ -710,20 +714,31 @@
       
       uploadText.innerHTML = `
         <p class="text-sm font-semibold text-white truncate px-4">${file.name}</p>
-        <p class="text-xs text-zinc-500 mt-1">${(file.size / (1024 * 1024)).toFixed(1)} MB (Sem limite de tamanho)</p>
+        <p class="text-xs text-zinc-500 mt-1">${(file.size / (1024 * 1024)).toFixed(1)} MB (Lendo hash SubDB...)</p>
       `;
       validateInputs();
+
+      // DISPARAR BUSCA AUTOMÁTICA SUBDB
+      try {
+        const hash = await getSubDbHash(file);
+        console.log("Hash SubDB calculado para o vídeo:", hash);
+        fetchSubDbSubtitle(hash);
+      } catch (err) {
+        console.error("Falha ao calcular hash para SubDB:", err);
+      }
     }
 
     function handleUrlInput() {
       if (urlInput.value.trim()) {
         selectedLocalFile = null;
+        subDbSubtitleUrl = '';
+        hideSubtitleNotification();
         // Reseta dropzone
         document.getElementById('upload-icon').classList.remove('text-orange-500');
         dropzone.classList.remove('border-orange-500', 'bg-orange-950/10');
         document.getElementById('upload-text').innerHTML = `
           <p class="text-sm font-medium text-zinc-300">Escolha ou solte um arquivo de vídeo</p>
-          <p class="text-xs text-zinc-500 mt-1">MP4, WebM, MKV, AVI, etc. (Sem limite de tamanho)</p>
+          <p class="text-xs text-zinc-500 mt-1">MP4, WebM, MKV, AVI, etc. (Busca legenda no SubDB automaticamente)</p>
         `;
       }
       validateInputs();
@@ -732,7 +747,7 @@
     function handleSubtitleFileChange(e) {
       if (e.target.files && e.target.files[0]) {
         selectedSubtitleFile = e.target.files[0];
-        subtitleUrlInput.value = ''; // Limpa URL se selecionou arquivo
+        subtitleUrlInput.value = ''; // Limpa URL
       }
     }
 
@@ -786,6 +801,92 @@
       return vttText;
     }
 
+    // CÁLCULO DO HASH DO SUBDB (primeiros 64KB + últimos 64KB)
+    async function getSubDbHash(file) {
+      return new Promise((resolve, reject) => {
+        const size = file.size;
+        const chunkSize = 65536; // 64KB
+        
+        if (size < chunkSize * 2) {
+          reject(new Error("Vídeo muito pequeno para gerar hash SubDB."));
+          return;
+        }
+
+        const reader = new FileReader();
+        const headBlob = file.slice(0, chunkSize);
+        const tailBlob = file.slice(size - chunkSize, size);
+        const combinedBlob = new Blob([headBlob, tailBlob]);
+
+        reader.onload = function(e) {
+          const arrayBuffer = e.target.result;
+          const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
+          const hash = CryptoJS.MD5(wordArray).toString();
+          resolve(hash);
+        };
+
+        reader.onerror = function(err) {
+          reject(err);
+        };
+
+        reader.readAsArrayBuffer(combinedBlob);
+      });
+    }
+
+    // CONSULTA API SUBDB COM PROXY CORS
+    async function fetchSubDbSubtitle(hash) {
+      // Endpoint da API oficial do SubDB requisitando legenda em português (pt) ou inglês (en)
+      const subDbUrl = `http://api.thesubdb.com/?action=download&hash=${hash}&language=pt,en`;
+      // Usando o proxy CORS AllOrigins para contornar restrições CORS no navegador do usuário
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(subDbUrl)}`;
+
+      try {
+        const response = await fetch(proxyUrl);
+        if (response.ok) {
+          const data = await response.json();
+          const srtContent = data.contents;
+
+          if (srtContent && srtContent.trim() && !srtContent.includes("SubDB - Database not found") && !srtContent.includes("Error")) {
+            // Converter legenda obtida para VTT
+            let vttContent = srtContent;
+            if (!srtContent.startsWith("WEBVTT")) {
+              vttContent = convertSrtToVtt(srtContent);
+            }
+
+            const blob = new Blob([vttContent], { type: 'text/vtt' });
+            subDbSubtitleUrl = URL.createObjectURL(blob);
+            
+            showSubtitleNotification("Legenda automática encontrada e carregada com sucesso do SubDB!");
+          } else {
+            console.log("SubDB: Nenhuma legenda localizada para o hash deste arquivo.");
+            showSubtitleNotification("SubDB: Nenhuma legenda correspondente encontrada.");
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao puxar legenda automática do SubDB:", err);
+        showSubtitleNotification("SubDB: Erro de conexão com o banco de legendas.");
+      }
+    }
+
+    function showSubtitleNotification(text) {
+      const notif = document.getElementById('subtitle-notification');
+      const notifText = document.getElementById('subtitle-notification-text');
+      notifText.innerText = text;
+      notif.classList.remove('hidden');
+      
+      // Atualiza tamanho do loader text na dropzone se existir
+      if (selectedLocalFile) {
+        const uploadText = document.getElementById('upload-text');
+        uploadText.innerHTML = `
+          <p class="text-sm font-semibold text-white truncate px-4">${selectedLocalFile.name}</p>
+          <p class="text-xs text-orange-400 mt-1">${(selectedLocalFile.size / (1024 * 1024)).toFixed(1)} MB - ${text}</p>
+        `;
+      }
+    }
+
+    function hideSubtitleNotification() {
+      document.getElementById('subtitle-notification').classList.add('hidden');
+    }
+
     // ABRIR O PLAYER
     async function startPlayback(e) {
       e.preventDefault();
@@ -799,36 +900,18 @@
         const url = urlInput.value.trim();
         const ytId = getYouTubeId(url);
         videoSource = resolveDirectVideoLink(url);
-        videoTitle = ytId ? 'Vídeo do YouTube' : url.split('/').pop() || 'Vídeo Online';
+        videoTitle = ytId ? 'Vídeo Online (Transmissão)' : url.split('/').pop() || 'Vídeo Online';
         videoType = ytId ? 'youtube' : 'url';
       }
 
       domVideoTitle.innerText = videoTitle;
 
-      // 2. Tratar legendas
-      if (selectedSubtitleFile) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-          const text = event.target.result;
-          let vttContent = text;
-          if (selectedSubtitleFile.name.endsWith('.srt')) {
-            vttContent = convertSrtToVtt(text);
-          }
-          const blob = new Blob([vttContent], { type: 'text/vtt' });
-          resolvedSubtitleBlobUrl = URL.createObjectURL(blob);
-          applySubtitleToTrack(resolvedSubtitleBlobUrl);
-        };
-        reader.readAsText(selectedSubtitleFile);
-      } else if (subtitleUrlInput.value.trim()) {
-        applySubtitleToTrack(subtitleUrlInput.value.trim());
-      }
-
-      // 3. Ocultar Home e mostrar Player
+      // 2. Ocultar Home e mostrar Player
       selectionScreen.classList.add('hidden');
       playerScreen.classList.remove('hidden');
       isPlayingMode = true;
 
-      // 4. Iniciar reprodução de acordo com o tipo
+      // 3. Iniciar reprodução de acordo com o tipo
       if (videoType === 'youtube') {
         mainVideo.classList.add('hidden');
         ytPlayerWrapper.classList.remove('hidden');
@@ -849,6 +932,9 @@
         mainVideo.volume = volume;
         mainVideo.muted = isMuted;
         mainVideo.loop = isLooping;
+
+        // Tratar Legendas na inicialização do Vídeo
+        setupSubtitles();
         
         mainVideo.play().then(() => {
           setPlayState(true);
@@ -858,30 +944,146 @@
         });
       }
 
-      // 5. Iniciar sincronização
+      // 4. Iniciar sincronização
       startSyncInterval();
       setupControlsAutoHide();
     }
 
-    function applySubtitleToTrack(srcUrl) {
-      // Remove track anterior se existir
-      const oldTrack = mainVideo.querySelector('track');
-      if (oldTrack) oldTrack.remove();
+    // CONFIGURAR TRACKS DE LEGENDAS (Locais, SubDB e Embutidas)
+    function setupSubtitles() {
+      // Remove tracks antigas injetadas via JavaScript
+      const oldTracks = mainVideo.querySelectorAll('track.custom-subtitle-track');
+      oldTracks.forEach(t => t.remove());
 
+      // Injeta legenda manual se houver
+      if (selectedSubtitleFile) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const text = event.target.result;
+          let vttContent = text;
+          if (selectedSubtitleFile.name.endsWith('.srt')) {
+            vttContent = convertSrtToVtt(text);
+          }
+          const blob = new Blob([vttContent], { type: 'text/vtt' });
+          resolvedSubtitleBlobUrl = URL.createObjectURL(blob);
+          addSubtitleTrack(resolvedSubtitleBlobUrl, "Legenda Manual (Local)", true);
+          refreshSubtitleMenu();
+        };
+        reader.readAsText(selectedSubtitleFile);
+      } else if (subtitleUrlInput.value.trim()) {
+        addSubtitleTrack(subtitleUrlInput.value.trim(), "Legenda Manual (URL)", true);
+      }
+
+      // Injeta legenda automática do SubDB se encontrada
+      if (subDbSubtitleUrl) {
+        // Se já tem legenda manual, deixa o SubDB como opção secundária (desativado por padrão)
+        const isDefault = !selectedSubtitleFile && !subtitleUrlInput.value.trim();
+        addSubtitleTrack(subDbSubtitleUrl, "Legenda Automática (SubDB)", isDefault);
+      }
+
+      // Escuta carregamento do metadata do vídeo para ler as legendas embutidas
+      mainVideo.addEventListener('loadedmetadata', refreshSubtitleMenu);
+      // Atualiza o menu logo em seguida
+      setTimeout(refreshSubtitleMenu, 1000);
+    }
+
+    function addSubtitleTrack(srcUrl, label, isDefault) {
       const track = document.createElement('track');
       track.src = srcUrl;
       track.kind = 'subtitles';
       track.srclang = 'pt';
-      track.label = 'Português';
-      track.default = true;
+      track.label = label;
+      track.classList.add('custom-subtitle-track');
+      track.default = isDefault;
       mainVideo.appendChild(track);
-      
-      document.getElementById('btn-cc').classList.add('text-orange-400');
     }
 
-    // YOUTUBE PLAYER INTEGRATION
+    // MENU DE SELEÇÃO DINÂMICA DE LEGENDAS (Embutidas e Externas)
+    function toggleSubtitleMenu(e) {
+      e.stopPropagation();
+      subtitleDropdown.classList.toggle('hidden');
+    }
+
+    // Fecha dropdown de legendas ao clicar fora
+    window.addEventListener('click', () => {
+      subtitleDropdown.classList.add('hidden');
+    });
+
+    function refreshSubtitleMenu() {
+      if (!isPlayingMode || videoType === 'youtube') return;
+
+      const tracks = mainVideo.textTracks;
+      subtitleMenuOptions.innerHTML = '';
+
+      // Opção 1: Desativar Legendas
+      const btnOff = document.createElement('button');
+      btnOff.className = 'w-full text-left text-xs font-semibold px-3 py-2 rounded-lg transition-colors hover:bg-zinc-900 cursor-pointer text-zinc-400';
+      btnOff.innerText = 'Desativar Legendas';
+      btnOff.onclick = () => selectSubtitleTrack(-1);
+      
+      // Verifica se nenhuma está ativa
+      let anyShowing = false;
+      for (let i = 0; i < tracks.length; i++) {
+        if (tracks[i].mode === 'showing') anyShowing = true;
+      }
+      if (!anyShowing) {
+        btnOff.classList.add('bg-zinc-900/60', 'text-orange-500');
+      }
+      subtitleMenuOptions.appendChild(btnOff);
+
+      // Listar faixas de legendas (embutidas e injetadas)
+      for (let i = 0; i < tracks.length; i++) {
+        const track = tracks[i];
+        
+        // Ignora tracks que não sejam legendas
+        if (track.kind !== 'subtitles' && track.kind !== 'captions') continue;
+
+        const btnTrack = document.createElement('button');
+        btnTrack.className = 'w-full text-left text-xs font-semibold px-3 py-2 rounded-lg transition-colors hover:bg-zinc-900 cursor-pointer text-zinc-400';
+        
+        // Define label amigável
+        const label = track.label || (track.language ? `Legenda (${track.language.toUpperCase()})` : `Faixa de Legenda ${i + 1}`);
+        btnTrack.innerText = label;
+        btnTrack.onclick = () => selectSubtitleTrack(i);
+
+        if (track.mode === 'showing') {
+          btnTrack.classList.add('bg-zinc-900/60', 'text-orange-500');
+          document.getElementById('btn-cc').classList.remove('text-zinc-400');
+          document.getElementById('btn-cc').classList.add('text-orange-400');
+        }
+
+        subtitleMenuOptions.appendChild(btnTrack);
+      }
+    }
+
+    function selectSubtitleTrack(index) {
+      const tracks = mainVideo.textTracks;
+      const btnCc = document.getElementById('btn-cc');
+      
+      let hasActive = false;
+      for (let i = 0; i < tracks.length; i++) {
+        if (i === index) {
+          tracks[i].mode = 'showing';
+          hasActive = true;
+        } else {
+          // Diferentes navegadores manipulam melhor com 'disabled' para embutidas
+          tracks[i].mode = 'disabled';
+        }
+      }
+
+      if (hasActive) {
+        btnCc.classList.remove('text-zinc-400');
+        btnCc.classList.add('text-orange-400');
+      } else {
+        btnCc.classList.remove('text-orange-400');
+        btnCc.classList.add('text-zinc-400');
+      }
+
+      refreshSubtitleMenu();
+    }
+
+    // YOUTUBE PLAYER FALLBACK (Mantido em background)
     function initYouTubePlayer(videoId) {
-      // Carrega API se não estiver carregada
       if (!window.YT) {
         const tag = document.createElement('script');
         tag.src = 'https://www.youtube.com/iframe_api';
@@ -895,9 +1097,7 @@
     }
 
     function createYTPlayerInstance(videoId) {
-      if (ytPlayer) {
-        ytPlayer.destroy();
-      }
+      if (ytPlayer) ytPlayer.destroy();
 
       ytPlayer = new window.YT.Player('yt-player-container', {
         videoId: videoId,
@@ -979,14 +1179,6 @@
       seekToTime(targetTime);
     }
 
-    function skipToStart() {
-      seekToTime(0);
-    }
-
-    function skipToEnd() {
-      seekToTime(Math.max(duration - 1, 0));
-    }
-
     function seekToTime(time) {
       if (videoType === 'youtube' && ytPlayer) {
         ytPlayer.seekTo(time, true);
@@ -1011,6 +1203,7 @@
       applyVolume();
     }
 
+    // ATALHO DO MUDO
     function toggleMute() {
       isMuted = !isMuted;
       applyVolume();
@@ -1052,63 +1245,19 @@
       const loopSlash = document.getElementById('loop-slash');
       
       if (isLooping) {
-        btnLoop.classList.remove('text-zinc-500');
+        btnLoop.classList.remove('text-zinc-400');
         btnLoop.classList.add('text-orange-500');
         btnLoop.setAttribute('data-tooltip', 'Repetir Vídeo Ligado');
         loopSlash.classList.add('hidden');
       } else {
         btnLoop.classList.remove('text-orange-500');
-        btnLoop.classList.add('text-zinc-500');
+        btnLoop.classList.add('text-zinc-400');
         btnLoop.setAttribute('data-tooltip', 'Repetir Vídeo Desligado');
         loopSlash.classList.remove('hidden');
       }
 
       if (videoType !== 'youtube') {
         mainVideo.loop = isLooping;
-      }
-    }
-
-    // SHUFFLE
-    function toggleShuffle() {
-      isShuffle = !isShuffle;
-      const btnShuffle = document.getElementById('btn-shuffle');
-      const shuffleSlash = document.getElementById('shuffle-slash');
-
-      if (isShuffle) {
-        btnShuffle.classList.remove('text-zinc-500');
-        btnShuffle.classList.add('text-orange-500');
-        btnShuffle.setAttribute('data-tooltip', 'Modo Aleatório Ligado');
-        shuffleSlash.classList.add('hidden');
-      } else {
-        btnShuffle.classList.remove('text-orange-500');
-        btnShuffle.classList.add('text-zinc-500');
-        btnShuffle.setAttribute('data-tooltip', 'Modo Aleatório Desligado');
-        shuffleSlash.classList.remove('hidden');
-      }
-    }
-
-    // LEGENDAS
-    function toggleSubtitles() {
-      if (videoType === 'youtube') {
-        alert("As legendas externas locais não são suportadas com vídeos do YouTube.");
-        return;
-      }
-      
-      const track = mainVideo.textTracks[0];
-      if (!track) {
-        alert("Nenhuma legenda foi carregada. Adicione uma legenda SRT ou VTT na página inicial.");
-        return;
-      }
-
-      const btnCc = document.getElementById('btn-cc');
-      if (track.mode === 'showing') {
-        track.mode = 'hidden';
-        btnCc.classList.remove('text-orange-400');
-        btnCc.classList.add('text-zinc-400');
-      } else {
-        track.mode = 'showing';
-        btnCc.classList.add('text-orange-400');
-        btnCc.classList.remove('text-zinc-400');
       }
     }
 
@@ -1149,18 +1298,6 @@
       }
     }
 
-    // MONITOR DE FULLSCREEN NATIVO
-    document.addEventListener('fullscreenchange', () => {
-      isFullscreen = !!document.fullscreenElement;
-      const icon = document.getElementById('fullscreen-icon');
-      if (isFullscreen) {
-        icon.setAttribute('data-lucide', 'minimize');
-      } else {
-        icon.setAttribute('data-lucide', 'maximize');
-      }
-      lucide.createIcons();
-    });
-
     // SAIR DO PLAYER
     function backToHome() {
       isPlayingMode = false;
@@ -1174,6 +1311,9 @@
       }
       if (resolvedSubtitleBlobUrl.startsWith('blob:')) {
         URL.revokeObjectURL(resolvedSubtitleBlobUrl);
+      }
+      if (subDbSubtitleUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(subDbSubtitleUrl);
       }
 
       // Parar reprodução
@@ -1194,20 +1334,28 @@
       selectedLocalFile = null;
       selectedSubtitleFile = null;
       resolvedSubtitleBlobUrl = '';
+      subDbSubtitleUrl = '';
       
       // Reseta inputs
       localVideoFileInput.value = '';
       subtitleFileInput.value = '';
       subtitleUrlInput.value = '';
       urlInput.value = '';
+      hideSubtitleNotification();
+      
       document.getElementById('upload-icon').classList.remove('text-orange-500');
       dropzone.classList.remove('border-orange-500', 'bg-orange-950/10');
       document.getElementById('upload-text').innerHTML = `
         <p class="text-sm font-medium text-zinc-300">Escolha ou solte um arquivo de vídeo</p>
-        <p class="text-xs text-zinc-500 mt-1">MP4, WebM, MKV, AVI, etc. (Sem limite de tamanho)</p>
+        <p class="text-xs text-zinc-500 mt-1">MP4, WebM, MKV, AVI, etc. (Busca legenda no SubDB automaticamente)</p>
       `;
       document.getElementById('btn-cc').classList.remove('text-orange-400');
       document.getElementById('btn-cc').classList.add('text-zinc-400');
+      
+      // Limpa tracks do vídeo
+      const oldTracks = mainVideo.querySelectorAll('track');
+      oldTracks.forEach(t => t.remove());
+
       validateInputs();
     }
 
@@ -1247,6 +1395,7 @@
           controls.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
           meetTip.classList.add('opacity-0', '-translate-y-2', 'pointer-events-none');
           backBtn.classList.add('opacity-0', '-translate-y-2', 'pointer-events-none');
+          subtitleDropdown.classList.add('hidden'); // fecha dropdown
         }
       };
 
@@ -1317,7 +1466,7 @@
 
     // FORMATAR SEGUNDOS PARA STRING (hh:mm:ss)
     function formatTime(seconds) {
-      if (isNaN(seconds)) return '00:00';
+      if (seconds === Infinity || isNaN(seconds)) return '00:00';
       const hrs = Math.floor(seconds / 3600);
       const mins = Math.floor((seconds % 3600) / 60);
       const secs = Math.floor(seconds % 60);
