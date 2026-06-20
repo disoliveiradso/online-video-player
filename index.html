@@ -33,6 +33,12 @@
   <!-- Matroska Subtitles CDN para extrair legendas embutidas em MKV/WebM -->
   <script src="https://cdn.jsdelivr.net/npm/matroska-subtitles@3.x/dist/matroska-subtitles.min.js"></script>
 
+  <!-- mux.js CDN para escanear metadados e faixas de vídeo locais -->
+  <script src="https://cdn.jsdelivr.net/npm/mux.js@6.2.0/dist/mux.min.js"></script>
+
+  <!-- SubtitlesOctopus CDN para renderizar legendas complexas (ASS/SSA) via WebAssembly -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/libass-wasm/4.1.0/js/subtitles-octopus.js"></script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -72,35 +78,34 @@
       outline: none;
     }
 
-    /* Animação do volume expansível no hover */
-    .volume-container {
+    /* Estilos do Volume Animado no Hover (Enquadramento Perfeito) */
+    .volume-group {
       display: flex;
       align-items: center;
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 8px;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-
-    .volume-container:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(217, 70, 239, 0.4);
-    }
-
-    .volume-range-custom {
+    
+    .volume-range-slider {
       width: 0px;
       opacity: 0;
       pointer-events: none;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+      margin-right: 0px;
     }
-
-    .volume-container:hover .volume-range-custom,
-    .volume-range-custom:focus {
+    
+    .volume-group:hover .volume-range-slider,
+    .volume-range-slider:focus {
       width: 70px;
       opacity: 1;
       pointer-events: auto;
+      margin-right: 8px;
     }
 
     /* Pastilha Glassmorphic para botões secundários (Nova Interface) */
@@ -278,7 +283,7 @@
           Reproduza qualquer vídeo online
         </h2>
         <p class="text-sm text-zinc-400 mt-2 max-w-md mx-auto">
-          Arraste um vídeo local (sem limite de tamanho) ou insira URLs de transmissão direto no navegador. Funciona por clique duplo direto no arquivo index.html!
+          Arraste um vídeo local (sem limite de tamanho) ou insira URLs de transmissão direto no navegador.
         </p>
       </div>
 
@@ -550,15 +555,8 @@
                </div>
              </div>
  
-             <!-- Botão 7: Volume com Slider Animado no Hover -->
-             <div class="volume-container">
-               <button 
-                 onclick="toggleMute()"
-                 class="text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                 title="Mudo (M)"
-               >
-                 <i data-lucide="volume-2" id="volume-icon" class="w-4.5 h-4.5"></i>
-               </button>
+             <!-- Botão 7: Volume com Slider Animado no Hover (Enquadramento Perfeito) -->
+             <div class="volume-group">
                <input
                  type="range"
                  id="volume-slider"
@@ -567,8 +565,15 @@
                  step="0.05"
                  value="0.8"
                  oninput="changeVolume(event)"
-                 class="volume-range volume-range-custom"
+                 class="volume-range-slider"
                />
+               <button 
+                 onclick="toggleMute()"
+                 class="btn-secondary-custom w-10 h-10 flex items-center justify-center text-zinc-400 hover:text-white cursor-pointer relative z-10"
+                 title="Mudo (M)"
+               >
+                 <i data-lucide="volume-2" id="volume-icon" class="w-4.5 h-4.5"></i>
+               </button>
              </div>
 
             <!-- Botão 8: Picture-in-Picture -->
@@ -701,6 +706,7 @@
     let resolvedSubtitleBlobUrl = '';
     let fetchedSubtitleBlobUrl = '';
     let embeddedSubtitles = []; // Armazena legendas internas extraídas do MKV
+    let octopusInstance = null; // Instância do renderizador SubtitlesOctopus (WASM)
 
     // Elementos da DOM
     const selectionScreen = document.getElementById('selection-screen');
@@ -810,6 +816,13 @@
         <p class="text-xs text-zinc-500 mt-1">${(file.size / (1024 * 1024)).toFixed(1)} MB (Processando busca de legenda...)</p>
       `;
       validateInputs();
+
+      // Escanear faixas e metadados usando mux.js
+      scanLocalVideoFile(file).then(tracksInfo => {
+        if (tracksInfo) {
+          console.log("mux.js - Trilhas identificadas no vídeo local:", tracksInfo);
+        }
+      });
 
       // Resetar legendas internas e iniciar extração se for contêiner de vídeo
       embeddedSubtitles = [];
@@ -1013,6 +1026,98 @@
 
         readNextChunk();
       });
+    }
+
+    // ESCANEAR ARQUIVO DE VÍDEO LOCAL COM MUX.JS PARA IDENTIFICAR FAIXAS DE ÁUDIO E VÍDEO
+    function scanLocalVideoFile(file) {
+      return new Promise((resolve) => {
+        if (typeof muxjs === 'undefined') {
+          console.warn("mux.js não carregado.");
+          resolve(null);
+          return;
+        }
+
+        const reader = new FileReader();
+        // Lemos os primeiros 15MB para inspeção rápida de caixas/metadados do contêiner
+        const slice = file.slice(0, 15 * 1024 * 1024);
+        
+        reader.onload = (e) => {
+          try {
+            const arrayBuffer = e.target.result;
+            const uint8Array = new Uint8Array(arrayBuffer);
+            
+            // Usar o MP4 probe do mux.js para detectar trilhas
+            const probeResult = muxjs.mp4.probe(uint8Array);
+            console.log("mux.js Probe - Mapeando faixas de mídia:", probeResult);
+            
+            const tracksInfo = {
+              audioTracks: [],
+              videoTracks: []
+            };
+
+            if (probeResult && probeResult.tracks) {
+              probeResult.tracks.forEach(track => {
+                if (track.type === 'audio') {
+                  tracksInfo.audioTracks.push({
+                    id: track.id,
+                    language: track.language || 'pt',
+                    codec: track.codec
+                  });
+                } else if (track.type === 'video') {
+                  tracksInfo.videoTracks.push({
+                    id: track.id,
+                    codec: track.codec
+                  });
+                }
+              });
+            }
+            resolve(tracksInfo);
+          } catch (err) {
+            console.warn("mux.js probe falhou para este contêiner (esperado para MKVs locais):", err);
+            resolve(null);
+          }
+        };
+
+        reader.onerror = () => resolve(null);
+        reader.readAsArrayBuffer(slice);
+      });
+    }
+
+    // RENDERIZAR LEGENDAS AVANÇADAS VIA SUBTITLESOCTOPUS (WASM / LIBASS)
+    function renderSubtitlesWithOctopus(subtitleSrc) {
+      // Destruir instância anterior se existir
+      if (octopusInstance) {
+        try {
+          octopusInstance.destroy();
+        } catch (e) {
+          console.warn("Erro ao destruir octopusInstance:", e);
+        }
+        octopusInstance = null;
+      }
+
+      if (typeof SubtitlesOctopus === 'undefined') {
+        console.warn("SubtitlesOctopus não está disponível no escopo.");
+        return;
+      }
+
+      console.log("SubtitlesOctopus - Iniciando renderização para a legenda:", subtitleSrc);
+
+      try {
+        // Criar o Worker a partir de um Blob inline para evitar restrições de CORS e protocolo file://
+        const workerCode = `importScripts('https://cdnjs.cloudflare.com/ajax/libs/libass-wasm/4.1.0/js/subtitles-octopus-worker.js');`;
+        const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+        const workerBlobUrl = URL.createObjectURL(workerBlob);
+
+        octopusInstance = new SubtitlesOctopus({
+          video: mainVideo,
+          subUrl: subtitleSrc,
+          workerUrl: workerBlobUrl,
+          legacyWorkerUrl: 'https://cdnjs.cloudflare.com/ajax/libs/libass-wasm/4.1.0/js/subtitles-octopus-worker-legacy.js',
+          wasmUrl: 'https://cdnjs.cloudflare.com/ajax/libs/libass-wasm/4.1.0/js/subtitles-octopus-worker.wasm'
+        });
+      } catch (err) {
+        console.error("Erro ao inicializar renderizador SubtitlesOctopus:", err);
+      }
     }
 
     // CONVERSÃO SRT PARA VTT
@@ -1405,21 +1510,33 @@
       const btnCc = document.getElementById('btn-cc');
       
       let hasActive = false;
+      let activeTrackUrl = '';
+
       for (let i = 0; i < tracks.length; i++) {
         if (i === index) {
-          tracks[i].mode = 'showing';
+          // Oculta a renderização nativa (evita caixa cinza) mantendo a faixa ativa
+          tracks[i].mode = 'hidden';
+          const domTrack = mainVideo.querySelectorAll('track')[i];
+          if (domTrack) {
+            activeTrackUrl = domTrack.src;
+          }
           hasActive = true;
         } else {
           tracks[i].mode = 'disabled';
         }
       }
 
-      if (hasActive) {
+      if (hasActive && activeTrackUrl) {
         btnCc.classList.remove('text-zinc-400');
         btnCc.classList.add('text-orange-400');
+        renderSubtitlesWithOctopus(activeTrackUrl);
       } else {
         btnCc.classList.remove('text-orange-400');
         btnCc.classList.add('text-zinc-400');
+        if (octopusInstance) {
+          try { octopusInstance.destroy(); } catch (e) {}
+          octopusInstance = null;
+        }
       }
 
       refreshSubtitleMenu();
@@ -1678,6 +1795,10 @@
         });
       }
       embeddedSubtitles = [];
+      if (octopusInstance) {
+        try { octopusInstance.destroy(); } catch (e) {}
+        octopusInstance = null;
+      }
 
       if (videoType === 'youtube' && ytPlayer) {
         ytPlayer.destroy();
