@@ -102,7 +102,7 @@
     
     .volume-group:hover .volume-range-slider,
     .volume-range-slider:focus {
-      width: 70px;
+      width: 90px;
       opacity: 1;
       pointer-events: auto;
       margin-right: 8px;
@@ -425,6 +425,26 @@
           </button>
         </div>
       </div>
+      
+      <!-- TELA DE STANDBY (OVERLAY ESTILO NETFLIX) -->
+      <div 
+        id="standby-overlay" 
+        class="hidden absolute inset-0 bg-black/60 backdrop-blur-sm z-25 flex flex-col justify-center items-center p-6 text-center select-none cursor-pointer"
+        onclick="togglePlay(); hideStandby();"
+      >
+        <div class="max-w-md animate-fade-in space-y-4">
+          <h2 id="standby-title" class="text-4xl font-extrabold text-white tracking-tight drop-shadow-lg">Título do Vídeo</h2>
+          <p class="text-sm text-zinc-400 font-medium">MeetPlayer Premium</p>
+          <div class="pt-4 flex justify-center">
+            <button 
+              class="w-16 h-16 rounded-full bg-gradient-to-tr from-orange-500 to-fuchsia-500 flex items-center justify-center text-white shadow-xl shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all duration-300"
+              onclick="event.stopPropagation(); togglePlay(); hideStandby();"
+            >
+              <i data-lucide="play" class="w-8 h-8 fill-white translate-x-[2px]"></i>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- PAINEL DE CONTROLES CUSTOMIZADOS (Estilo Cápsula Flutuante) -->
       <div 
@@ -514,7 +534,36 @@
  
            <!-- LADO DIREITO: CC/Idioma (Unificados), Volume Animado, Fullscreen, PiP (Sem os 3 pontinhos) -->
            <div class="flex items-center gap-2.5 relative">
-             
+              
+              <!-- Botão de Velocidade de Reprodução -->
+              <div class="relative">
+                <button 
+                  id="btn-speed"
+                  onclick="toggleSpeedMenu(event)"
+                  class="btn-secondary-custom w-10 h-10 flex items-center justify-center text-zinc-400 cursor-pointer"
+                  title="Velocidade de Reprodução"
+                >
+                  <i data-lucide="gauge" class="w-5 h-5"></i>
+                </button>
+                
+                <!-- Menu suspenso de Velocidades -->
+                <div 
+                  id="speed-dropdown" 
+                  class="hidden absolute bottom-12 right-0 w-36 bg-zinc-950/95 border border-white/10 rounded-xl p-2 shadow-2xl flex flex-col gap-1 z-40"
+                >
+                  <div class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider px-2 pb-1 border-b border-white/5 mb-1">
+                    Velocidade
+                  </div>
+                  <button class="btn-speed-option w-full text-left text-xs font-semibold px-2 py-1.5 rounded-lg text-zinc-400 hover:bg-zinc-900" onclick="changePlaybackRate(0.25)">0.25x</button>
+                  <button class="btn-speed-option w-full text-left text-xs font-semibold px-2 py-1.5 rounded-lg text-zinc-400 hover:bg-zinc-900" onclick="changePlaybackRate(0.5)">0.5x</button>
+                  <button class="btn-speed-option w-full text-left text-xs font-semibold px-2 py-1.5 rounded-lg text-zinc-400 hover:bg-zinc-900" onclick="changePlaybackRate(0.75)">0.75x</button>
+                  <button class="btn-speed-option w-full text-left text-xs font-semibold px-2 py-1.5 rounded-lg text-orange-500 bg-zinc-900/60" id="speed-opt-1" onclick="changePlaybackRate(1)">Normal</button>
+                  <button class="btn-speed-option w-full text-left text-xs font-semibold px-2 py-1.5 rounded-lg text-zinc-400 hover:bg-zinc-900" onclick="changePlaybackRate(1.25)">1.25x</button>
+                  <button class="btn-speed-option w-full text-left text-xs font-semibold px-2 py-1.5 rounded-lg text-zinc-400 hover:bg-zinc-900" onclick="changePlaybackRate(1.5)">1.5x</button>
+                  <button class="btn-speed-option w-full text-left text-xs font-semibold px-2 py-1.5 rounded-lg text-zinc-400 hover:bg-zinc-900" onclick="changePlaybackRate(2)">2x</button>
+                </div>
+              </div>
+              
              <!-- Botão 5: Legendas / CC & Idioma com menu suspenso unificado -->
              <div class="relative">
                <button 
@@ -561,7 +610,7 @@
                  type="range"
                  id="volume-slider"
                  min="0"
-                 max="1"
+                 max="3"
                  step="0.05"
                  value="0.8"
                  oninput="changeVolume(event)"
@@ -707,6 +756,93 @@
     let fetchedSubtitleBlobUrl = '';
     let embeddedSubtitles = []; // Armazena legendas internas extraídas do MKV
     let octopusInstance = null; // Instância do renderizador SubtitlesOctopus (WASM)
+
+    // VARIÁVEIS DO AMPLIFICADOR, VELOCIDADE E STANDBY
+    let audioCtx = null;
+    let sourceNode = null;
+    let gainNode = null;
+    let currentPlaybackRate = 1.0;
+    let standbyTimeout = null;
+    let isStandbyActive = false;
+
+    function initAudioContext() {
+      if (audioCtx) return;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+        sourceNode = audioCtx.createMediaElementSource(mainVideo);
+        gainNode = audioCtx.createGain();
+        
+        sourceNode.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        console.log("AudioContext & GainNode inicializados com sucesso.");
+      } catch (err) {
+        console.warn("Falha ao inicializar AudioContext:", err);
+      }
+    }
+
+    function toggleSpeedMenu(e) {
+      e.stopPropagation();
+      document.getElementById('speed-dropdown').classList.toggle('hidden');
+      subtitleDropdown.classList.add('hidden');
+    }
+
+    function changePlaybackRate(rate) {
+      currentPlaybackRate = rate;
+      if (videoType === 'youtube' && ytPlayer && ytPlayer.setPlaybackRate) {
+        ytPlayer.setPlaybackRate(rate);
+      } else if (mainVideo) {
+        mainVideo.playbackRate = rate;
+      }
+
+      const buttons = document.querySelectorAll('.btn-speed-option');
+      buttons.forEach(btn => {
+        btn.classList.remove('text-orange-500', 'bg-zinc-900/60');
+        btn.classList.add('text-zinc-400');
+        const rateVal = parseFloat(btn.innerText.replace('x', '').replace('Normal', '1'));
+        if (rateVal === rate) {
+          btn.classList.remove('text-zinc-400');
+          btn.classList.add('text-orange-500', 'bg-zinc-900/60');
+        }
+      });
+
+      const btnSpeed = document.getElementById('btn-speed');
+      if (rate !== 1.0) {
+        btnSpeed.classList.remove('text-zinc-400');
+        btnSpeed.classList.add('text-orange-400');
+        btnSpeed.setAttribute('title', `Velocidade: ${rate}x`);
+      } else {
+        btnSpeed.classList.remove('text-orange-400');
+        btnSpeed.classList.add('text-zinc-400');
+        btnSpeed.setAttribute('title', `Velocidade de Reprodução`);
+      }
+    }
+
+    function resetStandbyTimer() {
+      hideStandby();
+      if (standbyTimeout) clearTimeout(standbyTimeout);
+      if (!isPlaying && isPlayingMode) {
+        standbyTimeout = setTimeout(showStandby, 5000);
+      }
+    }
+
+    function showStandby() {
+      if (!isPlaying && isPlayingMode) {
+        document.getElementById('standby-title').innerText = videoTitle;
+        document.getElementById('standby-overlay').classList.remove('hidden');
+        isStandbyActive = true;
+      }
+    }
+
+    function hideStandby() {
+      const overlay = document.getElementById('standby-overlay');
+      if (overlay) overlay.classList.add('hidden');
+      isStandbyActive = false;
+    }
+
+    window.addEventListener('mousemove', resetStandbyTimer);
+    window.addEventListener('keydown', resetStandbyTimer);
+    window.addEventListener('click', resetStandbyTimer);
 
     // Elementos da DOM
     const selectionScreen = document.getElementById('selection-screen');
@@ -1307,8 +1443,7 @@
           mainVideo.src = videoSource;
         }
 
-        mainVideo.volume = volume;
-        mainVideo.muted = isMuted;
+        applyVolume();
         mainVideo.loop = isLooping;
 
         // Configura Legendas e Áudios
@@ -1456,10 +1591,12 @@
     function toggleSubtitleMenu(e) {
       e.stopPropagation();
       subtitleDropdown.classList.toggle('hidden');
+      document.getElementById('speed-dropdown').classList.add('hidden');
     }
 
     window.addEventListener('click', () => {
       subtitleDropdown.classList.add('hidden');
+      document.getElementById('speed-dropdown').classList.add('hidden');
     });
 
     function refreshSubtitleMenu() {
@@ -1623,10 +1760,12 @@
         playIcon.setAttribute('data-lucide', 'pause');
         playIcon.className = 'w-5 h-5 fill-white'; // Centralizado exato
         btnPlayPause.setAttribute('title', 'Pausar');
+        hideStandby();
       } else {
         playIcon.setAttribute('data-lucide', 'play');
         playIcon.className = 'w-5 h-5 fill-white translate-x-[1.5px]'; // Pequeno ajuste de Play
         btnPlayPause.setAttribute('title', 'Reproduzir');
+        resetStandbyTimer();
       }
       lucide.createIcons();
     }
@@ -1676,24 +1815,50 @@
       
       volumeSlider.value = currentVolume;
 
+      // Se o volume passar de 1.0 (100%), inicializa o AudioContext para o Boost
+      if (currentVolume > 1.0) {
+        initAudioContext();
+      }
+
       if (videoType === 'youtube' && ytPlayer) {
         if (isMuted) {
           ytPlayer.mute();
         } else {
           ytPlayer.unMute();
-          ytPlayer.setVolume(volume * 100);
+          ytPlayer.setVolume(Math.min(currentVolume, 1.0) * 100);
         }
       } else {
-        mainVideo.volume = currentVolume;
-        mainVideo.muted = isMuted;
+        if (gainNode) {
+          mainVideo.volume = Math.min(currentVolume, 1.0);
+          mainVideo.muted = isMuted;
+          gainNode.gain.value = isMuted ? 0 : (currentVolume > 1.0 ? currentVolume : 1.0);
+        } else {
+          mainVideo.volume = Math.min(currentVolume, 1.0);
+          mainVideo.muted = isMuted;
+        }
+      }
+
+      // Estilo visual do slider no modo Boost
+      if (currentVolume > 1.0) {
+        volumeSlider.style.background = 'linear-gradient(90deg, #f97316 0%, #d946ef 100%)';
+        volumeSlider.setAttribute('title', `Volume Amplificado: ${Math.round(currentVolume * 100)}%`);
+      } else {
+        volumeSlider.style.background = '';
+        volumeSlider.setAttribute('title', `Volume: ${Math.round(currentVolume * 100)}%`);
       }
 
       if (isMuted || currentVolume === 0) {
         volumeIcon.setAttribute('data-lucide', 'volume-x');
+        volumeIcon.classList.remove('text-orange-500');
+      } else if (currentVolume > 1.0) {
+        volumeIcon.setAttribute('data-lucide', 'volume-2');
+        volumeIcon.classList.add('text-orange-500'); // Cor de destaque no boost
       } else if (currentVolume > 0.5) {
         volumeIcon.setAttribute('data-lucide', 'volume-2');
+        volumeIcon.classList.remove('text-orange-500');
       } else {
         volumeIcon.setAttribute('data-lucide', 'volume-1');
+        volumeIcon.classList.remove('text-orange-500');
       }
       lucide.createIcons();
     }
@@ -1777,6 +1942,18 @@
       playerScreen.classList.add('hidden');
       
       if (syncInterval) clearInterval(syncInterval);
+      
+      if (audioCtx) {
+        try {
+          audioCtx.close();
+        } catch (e) {}
+        audioCtx = null;
+        sourceNode = null;
+        gainNode = null;
+      }
+      hideStandby();
+      if (standbyTimeout) clearTimeout(standbyTimeout);
+      changePlaybackRate(1.0);
       
       if (videoSource.startsWith('blob:')) {
         URL.revokeObjectURL(videoSource);
